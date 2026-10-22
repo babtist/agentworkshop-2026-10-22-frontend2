@@ -4,7 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { Model, parseResponse, parseStations, parsePositions, demoItems, validThresholds, DEFAULT_THRESHOLDS } = require('./model');
+const { Model, parseResponse, parseStations, parsePositions, parseNotices, activeNotices, demoItems, validThresholds, DEFAULT_THRESHOLDS } = require('./model');
 
 const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
 const MAX_DISPLAYS = 500;
@@ -17,6 +17,7 @@ const TRAIN_RE = /^[A-Za-z0-9]{1,10}$/;
 const STATION_RE = /^[A-Za-z0-9åäöÅÄÖ ]{1,10}$/;
 const STATIONS_RETRY_MS = 10 * 60 * 1000;
 const STATIONS_REFRESH_MS = 24 * 60 * 60 * 1000;
+const NOTICES_REFRESH_MS = Math.max(60000, Number(process.env.BABTIST_NOTICES_MS) || 5 * 60 * 1000);
 // Demo mode has no key, so no station list: keep one known marker so map UIs have something to draw.
 const FALLBACK_STATIONS = new Map([['Sci', { name: 'Stockholm City', lat: 59.3307, lon: 18.0592 }]]);
 const UPSTREAM_URL = process.env.TRAFIKVERKET_URL || 'https://api.trafikinfo.trafikverket.se/v2/data.json';
@@ -27,6 +28,7 @@ const streams = new Set();
 const stations = { coords: new Map(), loadedAt: 0, attemptAt: 0 };
 // Latest position per tracked train number: train -> { lat, lon, bearing, at (ms) }.
 const positions = new Map();
+const notices = { list: [], attemptAt: 0, upstream: 'no-key', updatedAt: null };
 const posState = { upstream: 'no-key', updatedAt: null, timer: null };
 const state = { upstream: 'no-key', lastPollAt: null, changeId: null, lastFullAt: 0, updatedAt: new Date().toISOString(), displaysFile: null, timer: null, ping: null };
 
@@ -96,6 +98,30 @@ function buildPositionQuery(key, trains) {
     <INCLUDE>Position.WGS84</INCLUDE>
     <INCLUDE>TimeStamp</INCLUDE>
     <INCLUDE>Bearing</INCLUDE>
+    <INCLUDE>Deleted</INCLUDE>
+  </QUERY>
+</REQUEST>`;
+}
+
+function buildNoticeQuery(key, sigs) {
+  return `<REQUEST>
+  <LOGIN authenticationkey="${key}"/>
+  <QUERY objecttype="TrainStationMessage" namespace="Rail.TrafficInfo" schemaversion="1.0">
+    <FILTER>
+      <AND>
+        <IN name="LocationCode" value="${sigs.join(',')}"/>
+        <GT name="EndDateTime" value="$now"/>
+      </AND>
+    </FILTER>
+    <INCLUDE>Id</INCLUDE>
+    <INCLUDE>LocationCode</INCLUDE>
+    <INCLUDE>FreeText</INCLUDE>
+    <INCLUDE>Status</INCLUDE>
+    <INCLUDE>MediaType</INCLUDE>
+    <INCLUDE>StartDateTime</INCLUDE>
+    <INCLUDE>EndDateTime</INCLUDE>
+    <INCLUDE>SplitActivationTime</INCLUDE>
+    <INCLUDE>ActiveDays</INCLUDE>
     <INCLUDE>Deleted</INCLUDE>
   </QUERY>
 </REQUEST>`;
@@ -204,6 +230,41 @@ async function refreshStations(now = Date.now()) {
   stations.loadedAt = Date.now();
 }
 
+// Station notices (screens, platform signs, loudspeakers) for every station the model knows, at most every 5 min.
+// A failed round keeps the last list; whether a notice is shown is decided at request time.
+async function refreshNotices(now = Date.now()) {
+  const key = loadKey();
+  if (!key) { notices.list = []; notices.upstream = 'no-key'; notices.updatedAt = new Date(now).toISOString(); return; }
+  if (notices.attemptAt && now - notices.attemptAt < NOTICES_REFRESH_MS) return;
+  const sigs = model.stationsFor(DEFAULT_THRESHOLDS, now).map(s => s.station).filter(s => STATION_RE.test(s)).sort();
+  if (sigs.length === 0) return;
+  notices.attemptAt = now;
+  try {
+    const res = await fetch(UPSTREAM_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'text/xml' },
+      body: buildNoticeQuery(key, sigs),
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!res.ok) throw new Error('upstream HTTP ' + res.status);
+    notices.list = parseNotices(await res.json());
+    notices.upstream = 'ok';
+    notices.updatedAt = new Date().toISOString();
+  } catch (err) {
+    notices.upstream = 'error';
+    throw err;
+  }
+}
+
+function noticesBody(sig, now = Date.now()) {
+  const list = activeNotices(sig ? notices.list.filter(n => n.station === sig) : notices.list, now).map(n => {
+    const { stations: sts, ...rest } = n;
+    return sig ? rest : { ...rest, stations: sts.map(s => ({ station: s, name: stationInfo(s).name })) };
+  });
+  const head = sig ? { station: sig, name: stationInfo(sig).name } : {};
+  return { ...head, updatedAt: notices.updatedAt, upstream: notices.upstream, count: list.length, notices: list };
+}
+
 function stationInfo(sig) {
   return stations.coords.get(sig) || FALLBACK_STATIONS.get(sig) || { name: sig, lat: null, lon: null };
 }
@@ -264,6 +325,7 @@ async function tick() {
   }
   try { broadcast(); } catch (err) { console.error('[babtist] broadcast:', err && err.message); }
   try { await refreshStations(); } catch (err) { console.error('[babtist] station list failed:', err && err.message); }
+  try { await refreshNotices(); } catch (err) { console.error('[babtist] station notices failed:', err && err.message); }
 }
 
 function schedule(ms) {
@@ -337,7 +399,7 @@ module.exports = {
       for (const [id, v] of Object.entries(saved)) if (ID_RE.test(id) && validThresholds(v)) displays.set(id, { trains: v.trains, minutes: v.minutes });
     } catch {}
     // Until the first poll answers, a configured key means "not fresh yet" (error), not "no-key".
-    if (loadKey()) { state.upstream = 'error'; posState.upstream = 'error'; }
+    if (loadKey()) { state.upstream = 'error'; posState.upstream = 'error'; notices.upstream = 'error'; }
     schedule(0);
     schedulePositions(POSITION_POLL_MS);
     state.ping = setInterval(() => {
@@ -375,11 +437,14 @@ module.exports = {
       return json(res, 200, stationsBody(id));
     }
 
-    const sm = /^\/api\/stations\/([^/]+)\/next$/.exec(p);
+    if (req.method === 'GET' && p === '/api/notices') return json(res, 200, noticesBody(null));
+
+    const sm = /^\/api\/stations\/([^/]+)\/(next|notices)$/.exec(p);
     if (req.method === 'GET' && sm) {
       let sig;
       try { sig = decodeURIComponent(sm[1]); } catch { sig = null; }
       if (!sig || !STATION_RE.test(sig)) return json(res, 400, { error: 'station must be a station signature (letters, digits, space; at most 10)' });
+      if (sm[2] === 'notices') return json(res, 200, noticesBody(sig));
       const raw = params.get('limit');
       const limit = raw == null || raw === '' ? 10 : /^\d{1,2}$/.test(raw) ? Number(raw) : NaN;
       if (!Number.isInteger(limit) || limit < 1 || limit > 30) return json(res, 400, { error: 'limit must be an integer 1..30' });

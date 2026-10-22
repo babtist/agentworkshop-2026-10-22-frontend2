@@ -77,6 +77,85 @@ function parsePositions(json) {
   return out;
 }
 
+const PRIORITY = { Hog: 'high', Normal: 'normal', Lag: 'low' };
+const PRIORITY_RANK = { high: 0, normal: 1, low: 2 };
+const MEDIA = { Monitor: 'monitor', Plattformsskylt: 'platform', Utrop: 'announcement' };
+
+// Local Stockholm parts of an instant: date (YYYY-MM-DD) and minutes since midnight.
+function localParts(ms) {
+  const f = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Stockholm', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  const p = Object.fromEntries(f.formatToParts(new Date(ms)).map(x => [x.type, x.value]));
+  return { date: `${p.year}-${p.month}-${p.day}`, min: Number(p.hour) * 60 + Number(p.minute) };
+}
+const dayDiff = (a, b) => Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400000);
+
+// Sign text is wrapped for the screen: join "word-\nword", turn other line breaks into spaces.
+const noticeText = t => t.replace(/-\s*\n\s*/g, '-').replace(/\s+/g, ' ').trim().slice(0, 500);
+
+// Is a TrainStationMessage shown right now? Outside start..end: no. With SplitActivationTime it is shown only
+// between the start's and the end's time of day (may wrap past midnight), and ActiveDays ('y'/'n' per day,
+// counted from the start date) can switch single days off.
+function noticeActive(n, now = Date.now()) {
+  if (n.start != null && now < n.start) return false;
+  if (n.end != null && now >= n.end) return false;
+  if (!n.split || n.start == null || n.end == null) return true;
+  const s = localParts(n.start), e = localParts(n.end), c = localParts(now);
+  const wraps = e.min <= s.min;
+  const inWindow = wraps ? c.min >= s.min || c.min < e.min : c.min >= s.min && c.min < e.min;
+  if (!inWindow) return false;
+  if (!n.days) return true;
+  const periodDate = wraps && c.min < e.min ? localParts(now - 86400000).date : c.date;
+  const i = dayDiff(s.date, periodDate);
+  return i >= 0 && i < n.days.length ? n.days[i] === 'y' : true;
+}
+
+// TrainStationMessage response -> [{ id, station, text, priority, media, start, end (ms), split, days }]. Throws on an upstream error.
+function parseNotices(json) {
+  const result = json && json.RESPONSE && json.RESPONSE.RESULT && json.RESPONSE.RESULT[0];
+  if (!result) throw new Error('unexpected response shape');
+  if (result.ERROR) throw new Error('upstream error: ' + (result.ERROR.MESSAGE || 'unknown'));
+  const out = [];
+  for (const m of Array.isArray(result.TrainStationMessage) ? result.TrainStationMessage : []) {
+    if (!m || m.Deleted || typeof m.LocationCode !== 'string' || typeof m.FreeText !== 'string') continue;
+    const text = noticeText(m.FreeText);
+    if (!text) continue;
+    out.push({
+      id: typeof m.Id === 'string' ? m.Id : null,
+      station: m.LocationCode,
+      text,
+      priority: PRIORITY[m.Status] || 'normal',
+      media: MEDIA[m.MediaType] || 'other',
+      start: toMs(m.StartDateTime),
+      end: toMs(m.EndDateTime),
+      split: m.SplitActivationTime === true,
+      days: typeof m.ActiveDays === 'string' && /^[yn]+$/.test(m.ActiveDays) ? m.ActiveDays : null,
+    });
+  }
+  return out;
+}
+
+// Active notices, one per text: the same text on monitor, platform sign and loudspeaker becomes one notice
+// with all its media, the highest priority and the widest time span. Sorted high -> low, then newest first.
+function activeNotices(list, now = Date.now()) {
+  const byText = new Map();
+  for (const n of list) {
+    if (!noticeActive(n, now)) continue;
+    const cur = byText.get(n.text);
+    if (!cur) {
+      byText.set(n.text, { id: n.id, text: n.text, priority: n.priority, media: [n.media], start: n.start, end: n.end, stations: [n.station] });
+      continue;
+    }
+    if (PRIORITY_RANK[n.priority] < PRIORITY_RANK[cur.priority]) cur.priority = n.priority;
+    if (!cur.media.includes(n.media)) cur.media.push(n.media);
+    if (!cur.stations.includes(n.station)) cur.stations.push(n.station);
+    if (n.start != null && (cur.start == null || n.start < cur.start)) cur.start = n.start;
+    if (cur.end != null && (n.end == null || n.end > cur.end)) cur.end = n.end;
+  }
+  return [...byText.values()]
+    .sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || (b.start || 0) - (a.start || 0) || (a.text < b.text ? -1 : 1))
+    .map(n => ({ ...n, media: n.media.sort(), stations: n.stations.sort(), start: iso(n.start), end: iso(n.end) }));
+}
+
 // Trafikverket Deviation / OtherInformation: [{ Code, Description }] (older schemas: plain strings).
 function infoList(v) {
   if (!Array.isArray(v)) return [];
@@ -382,4 +461,4 @@ function validThresholds(b) {
     Number.isInteger(b.minutes) && b.minutes >= 1 && b.minutes <= 240;
 }
 
-module.exports = { Model, parseResponse, parseStations, parsePositions, parseWgs84, demoItems, levelThresholds, validThresholds, DEFAULT_THRESHOLDS };
+module.exports = { Model, parseResponse, parseStations, parsePositions, parseNotices, noticeActive, activeNotices, parseWgs84, demoItems, levelThresholds, validThresholds, DEFAULT_THRESHOLDS };

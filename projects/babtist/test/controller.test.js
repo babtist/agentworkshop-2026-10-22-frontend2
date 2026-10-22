@@ -24,6 +24,7 @@ const upstream = http.createServer((req, res) => {
     res.setHeader('content-type', 'application/json');
     if (b.includes('objecttype="TrainPosition"')) return res.end(JSON.stringify({ RESPONSE: { RESULT: [{ TrainPosition: [] }] } }));
     if (b.includes('objecttype="TrainStation"')) return res.end(JSON.stringify({ RESPONSE: { RESULT: [{ TrainStation: STATIONS }] } }));
+    if (b.includes('objecttype="TrainStationMessage"')) return res.end(JSON.stringify({ RESPONSE: { RESULT: [{ TrainStationMessage: [] }] } }));
     lastBody = b;
     res.end(JSON.stringify({ RESPONSE: { RESULT: [{ TrainAnnouncement: [
       ann('1', 20, 7, { ToLocation: [{ LocationName: 'Söc', Priority: 1, Order: 0 }] }), ann('2', 15, 9), ann('3', 10, 12), ann('4', 8, 0), ann('5', 5, 0, { Canceled: true, TimeAtLocation: undefined }),
