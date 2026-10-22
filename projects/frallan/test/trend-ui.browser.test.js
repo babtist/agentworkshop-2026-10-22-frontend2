@@ -128,7 +128,7 @@ test('real Chromium: visual states, honest history and widget lifecycle', { time
         await expect(card).toHaveAttribute('data-direction', state);
         await expect(card.locator('.frallan-trend-current-dot')).toHaveCount(1);
         await expect(card.locator('.frallan-trend-guide')).toHaveCount(2);
-        await expect(card.locator('.frallan-trend-change')).toContainText('5-minute change');
+        await expect(card.locator('.frallan-trend-change')).toContainText('trains · 5 min');
         await expect(card.getByRole('img')).toHaveAccessibleName('Late trains over the last 30 minutes');
         assert.match(lastSearch, /displayId=hall-1/);
         await screenshot(state);
@@ -141,6 +141,9 @@ test('real Chromium: visual states, honest history and widget lifecycle', { time
       await expect(card.locator('.frallan-trend-area')).toHaveCount(0);
       await expect(card.locator('.frallan-trend-current-dot')).toHaveCount(1);
       await expect(card.locator('.frallan-trend-change strong')).toHaveText('—');
+      await expect(card.locator('.frallan-trend-caption')).toBeVisible();
+      await expect(card.locator('.frallan-trend-caption')).toContainText('0.0/5 min observed');
+      assert.ok((await card.boundingBox()).height < 310, 'warm-up stays compact without hiding baseline progress');
       await expect(card).toContainText('0.0 of 5 continuous minutes');
       await screenshot('warmup');
     });
@@ -184,6 +187,45 @@ test('real Chromium: visual states, honest history and widget lifecycle', { time
       await screenshot('narrow-dark');
       await page.setViewportSize({ width: 1100, height: 850 });
       await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' });
+    });
+    await t.test('compact layout inherits a dark host even in light mode and keeps details accessible across refreshes', async () => {
+      await load('improving');
+      await page.addStyleTag({ content: 'details { padding:16px; border:1px solid #304050; background:#0c1424; }' });
+      await page.evaluate(() => {
+        const host = document.getElementById('service-trend');
+        host.style.cssText = 'width:600px;max-width:100%;background:#10251f;color:#e3edef';
+      });
+      await expect(card.locator('.frallan-trend-value')).not.toBeVisible();
+      await expect(card.locator('.frallan-trend-direction')).toBeVisible();
+      await expect(card.locator('svg')).toBeVisible();
+      await expect.poll(async () => (await card.boundingBox()).height).toBeLessThan(280);
+      const colours = await card.evaluate(el => ({
+        text: getComputedStyle(el).color,
+        host: getComputedStyle(el.parentElement).color,
+        background: getComputedStyle(el).backgroundColor
+      }));
+      assert.equal(colours.text, colours.host);
+      assert.notEqual(colours.background, 'rgb(255, 255, 255)');
+      const toggle = card.locator('summary');
+      await toggle.focus();
+      await page.keyboard.press('Enter');
+      await expect(card.locator('.frallan-trend-value')).toBeVisible();
+      const refresh = card.getByRole('button', { name: 'Refresh', exact: true });
+      await refresh.click();
+      await expect(refresh).toBeFocused();
+      await expect(card.locator('.frallan-trend-value')).toBeVisible();
+      const before = calls;
+      await toggle.focus();
+      await page.evaluate(() => window.dispatchEvent(new CustomEvent('peter:thresholds', { detail: { displayId: 'hall-1' } })));
+      await expect.poll(() => calls).toBeGreaterThan(before);
+      await expect(card).toHaveAttribute('data-availability', 'ready');
+      await expect(toggle).toBeFocused();
+      await expect(card.locator('.frallan-trend-value')).toBeVisible();
+      await page.keyboard.press('Enter');
+      await expect(card.locator('.frallan-trend-value')).not.toBeVisible();
+      await page.evaluate(() => { document.getElementById('service-trend').style.width = '290px'; });
+      await expect.poll(async () => (await card.boundingBox()).height).toBeLessThan(310);
+      await screenshot('compact-host');
     });
     await t.test('embedded mount is isolated, safe for external text and retains only labeled history on errors', async () => {
       await load('improving');

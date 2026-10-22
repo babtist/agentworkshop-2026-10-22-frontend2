@@ -4,7 +4,7 @@ name: live-train-layer
 type: capability
 domain: frontend
 tools: Read, Write, Edit, Grep, Glob, Bash
-energy: 65
+energy: 75
 spawned: 2026-10-22
 can-merge-with: [station-delay-map]
 ---

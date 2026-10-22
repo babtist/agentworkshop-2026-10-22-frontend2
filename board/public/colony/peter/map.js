@@ -86,7 +86,7 @@
     const sel = window.peterMap.stations.get(window.peterMap.selected);
     if (sel) ring.setLatLng([sel.lat, sel.lon]).bringToFront();
     window.dispatchEvent(new CustomEvent('peter:stations'));
-    if (!fitted && pts.length > 1) { map.fitBounds(pts, { padding: [20, 20] }); fitted = true; }
+    if (!fitted && pts.length > 1 && !window.peterMap.routeOpen) { map.fitBounds(pts, { padding: [20, 20] }); fitted = true; }
     const counts = stations.reduce((a, s) => (a[s.level] = (a[s.level] || 0) + 1, a), {});
     const status = data.upstream === 'no-key' ? ' · demo data' : data.upstream === 'error' ? ' · upstream error, may be stale' : '';
     note.textContent = `${stations.length} stations · ${counts.severe || 0} severe, ${counts.warning || 0} warning` +

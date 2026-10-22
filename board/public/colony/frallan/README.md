@@ -18,6 +18,13 @@ required. Service Trend is displayed only inside the Group App; there is no
 public `index.html` or separate frallan colony tile. Browser tests use a local
 HTML fixture outside the public asset folder.
 
+The compact inset inherits the host's text colour and uses translucent tonal
+surfaces, so it fits the Group App even when its dark theme differs from the
+browser's colour preference. Direction, five-minute change, the short chart,
+freshness and any warm-up/outage message remain visible. Repeated current
+counts, thresholds and explanations sit behind a keyboard-accessible Details
+disclosure; its expanded state and keyboard focus survive refreshes.
+
 The card polls the same-origin `/t/frallan/api/trend` endpoint every 15 seconds
 with an eight-second timeout. The chart shows real timestamps over a rolling
 30-minute window; null observations and gaps longer than 60 seconds split both

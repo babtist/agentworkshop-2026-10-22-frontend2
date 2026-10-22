@@ -80,12 +80,16 @@ only inside the Group App. The public asset folder deliberately has no
 index.html, so colony discovery does not list a separate frallan tile.
 Browser tests mount the same production widget from a test-only HTML fixture.
 
-Design: a polished responsive card with a directional icon/text, late-train
-count, five-minute change, accessible SVG sparkline, warning/severe threshold
-guides, a 30-minute time axis and explicit warm-up/age notices. Neutral states
-must never look like a healthy zero; stale history may remain visible only with
-an obvious non-current label. No fake data or demo controls in production.
-Local browser fixtures may supply synthetic history for visual verification.
+Design: a compact inset with directional icon/text, five-minute change, short
+accessible SVG sparkline, threshold guides, a 30-minute time axis and visible
+freshness/warm-up/outage states. It inherits the actual host foreground and
+uses translucent tonal surfaces, rather than assuming the browser's preferred
+theme matches the dashboard. Repeated current count, threshold explanations
+and manual refresh are available through a native Details disclosure, which
+preserves its open state and focus during updates. Neutral states never look
+like a healthy zero; stale history always has a non-current label. No fake data
+or demo controls in production. Local browser fixtures may supply synthetic
+history for visual verification. The mount interface and API are unchanged.
 
 Peter can replace the existing small page-memory trend with this widget,
 instead of rendering duplicate charts. The widget owns only its mount subtree.

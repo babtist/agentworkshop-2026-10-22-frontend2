@@ -40,7 +40,7 @@
 
   // Every segment is real observed time. Unknown samples and gaps are pen lifts.
   function geometry(points, end, threshold, width = 756) {
-    const left = 26, right = width - 16, top = 24, bottom = 180;
+    const left = 26, right = width - 16, top = 14, bottom = 84;
     const start = end - WINDOW;
     const sorted = points.map(point => ({ ...point, time: Date.parse(point.at) }))
       .filter(point => Number.isFinite(point.time) && point.time >= start && point.time <= end)
@@ -102,6 +102,8 @@
     function render(data, reason) {
       if (destroyed) return;
       const restoreFocus = card.contains(doc.activeElement) && doc.activeElement.classList.contains('frallan-trend-refresh');
+      const restoreDetailsFocus = card.contains(doc.activeElement) && doc.activeElement.classList.contains('frallan-trend-details-toggle');
+      const detailsOpen = card.querySelector('details')?.open ?? false;
       lastRender = { data, reason };
       const now = Date.now();
       let availability = data ? data.availability : 'loading';
@@ -129,7 +131,7 @@
         unknown: { icon: '—', title: 'Not yet known', text: 'A five-minute comparison is not available.' }
       }[direction];
       const labels = {
-        loading: 'Connecting', ready: 'Live observations', 'warming-up': 'Warming up',
+        loading: 'Connecting', ready: 'Live', 'warming-up': 'Warming up',
         stale: 'Stale · not current', unavailable: 'Unavailable', demo: 'Demo · not live'
       };
       card.replaceChildren();
@@ -137,36 +139,43 @@
       card.dataset.availability = availability;
       const header = el('div', 'frallan-trend-header', undefined, card);
       const title = el('div', '', undefined, header);
-      el('p', 'frallan-trend-eyebrow', 'THE LAST 30 MINUTES', title);
       el('h2', 'frallan-trend-title', 'Service trend', title).id = id + '-heading';
       const status = el('span', 'frallan-trend-status', labels[availability], header);
       status.setAttribute('role', 'status');
-      el('p', 'frallan-trend-display', 'Display · ' + displayId, card);
+      const details = el('details', 'frallan-trend-details');
+      details.open = detailsOpen;
+      const detailsToggle = el('summary', 'frallan-trend-details-toggle', 'Details', details);
+      const detailsBody = el('div', 'frallan-trend-details-body', undefined, details);
+      el('p', 'frallan-trend-display', 'Display · ' + displayId, detailsBody);
 
-      const metrics = el('div', 'frallan-trend-metrics', undefined, card);
+      const metrics = el('div', 'frallan-trend-metrics', undefined, detailsBody);
       const currentMetric = el('div', 'frallan-trend-current', undefined, metrics);
       const value = el('div', 'frallan-trend-value', current ? String(currentPoint.lateCount) : '—', currentMetric);
       value.setAttribute('aria-label', current ? currentPoint.lateCount + ' late trains currently' : 'Current late-train count unavailable');
       el('p', 'frallan-trend-metric-label', 'late trains now', currentMetric);
       el('p', 'frallan-trend-secondary', current && data.thresholds ?
         'At least ' + data.thresholds.minutes + ' minutes behind schedule' : 'Waiting for verified live observations', currentMetric);
-      const comparison = el('div', 'frallan-trend-comparison', undefined, metrics);
+      const comparison = el('div', 'frallan-trend-comparison', undefined, card);
       const badge = el('div', 'frallan-trend-direction', undefined, comparison);
       el('span', 'frallan-trend-direction-icon', look.icon, badge).setAttribute('aria-hidden', 'true');
       el('span', '', look.title, badge);
       const delta = availability === 'ready' ? (data.delta > 0 ? '+' : data.delta < 0 ? '−' : '') + Math.abs(data.delta) : '—';
       const change = el('p', 'frallan-trend-change', undefined, comparison);
       el('strong', '', delta, change);
-      el('span', '', ' trains · 5-minute change', change);
-      el('p', 'frallan-trend-secondary', look.text, comparison);
+      el('span', '', ' trains · 5 min', change);
+      change.setAttribute('aria-label', availability === 'ready' ?
+        delta + ' trains compared with five minutes ago' : 'Five-minute comparison not available');
+      el('p', 'frallan-trend-secondary', look.text, metrics);
+      if (data?.thresholds) el('p', 'frallan-trend-secondary',
+        'Warning at ' + data.thresholds.trains + ' late trains; severe at ' + data.thresholds.trains * 2 + '.', detailsBody);
 
       const shown = data && data.points.some(point => count(point.lateCount)) ? data : history;
       const historical = !current && shown && shown.points.some(point => count(point.lateCount));
       const chartHeader = el('div', 'frallan-trend-chart-header', undefined, card);
-      el('h3', '', 'Late-train history', chartHeader);
+      el('h3', '', 'Late trains · 30 min', chartHeader);
       el('span', 'frallan-trend-chart-note', historical ? 'HISTORICAL · NOT CURRENT' : 'OBSERVED, NOT PREDICTED', chartHeader);
       const chart = svg('svg', {
-        viewBox: '0 0 ' + chartWidth + ' 216', role: 'img', 'aria-labelledby': id + '-chart-title',
+        viewBox: '0 0 ' + chartWidth + ' 116', role: 'img', 'aria-labelledby': id + '-chart-title',
         'aria-describedby': id + '-chart-desc',
         class: 'frallan-trend-chart', preserveAspectRatio: 'xMidYMid meet'
       }, undefined, card);
@@ -183,7 +192,9 @@
       if (threshold) {
         [[threshold, 'Warning', 'warning'], [threshold * 2, 'Severe', 'severe']].forEach(([n, label, level]) => {
           svg('line', { x1: g.left, x2: g.right, y1: g.y(n), y2: g.y(n), class: 'frallan-trend-guide frallan-trend-guide-' + level }, undefined, chart);
-          svg('text', { x: g.left + 4, y: g.y(n) - 7, class: 'frallan-trend-guide-label' }, label + ' · ' + n, chart);
+          if (Math.abs(g.y(threshold) - g.y(threshold * 2)) >= 16) {
+            svg('text', { x: g.left + 4, y: g.y(n) - 7, class: 'frallan-trend-guide-label' }, label + ' · ' + n, chart);
+          }
         });
       }
       const defs = svg('defs', {}, undefined, chart);
@@ -208,10 +219,10 @@
         }
       }
       [['−30 min', g.left, 'start'], ['−15 min', (g.left + g.right) / 2, 'middle'], ['Now', g.right, 'end']].forEach(([label, x, anchor]) =>
-        svg('text', { x, y: 207, 'text-anchor': anchor, class: 'frallan-trend-axis' }, label, chart));
+        svg('text', { x, y: 108, 'text-anchor': anchor, class: 'frallan-trend-axis' }, label, chart));
       if (!g.segments.length) {
-        svg('rect', { x: chartWidth / 2 - 91, y: 97, width: 182, height: 24, rx: 6, class: 'frallan-trend-empty-backdrop' }, undefined, chart);
-        svg('text', { x: chartWidth / 2, y: 113, 'text-anchor': 'middle', class: 'frallan-trend-empty' }, 'No observed history yet', chart);
+        svg('rect', { x: chartWidth / 2 - 91, y: 41, width: 182, height: 24, rx: 6, class: 'frallan-trend-empty-backdrop' }, undefined, chart);
+        svg('text', { x: chartWidth / 2, y: 57, 'text-anchor': 'middle', class: 'frallan-trend-empty' }, 'No observed history yet', chart);
       }
       const notices = {
         loading: ['Connecting to live service', 'Only real observations will appear here.'],
@@ -221,22 +232,33 @@
         unavailable: ['Live service is unavailable', 'No verified current count. Any retained history is explicitly non-current. We will retry automatically.'],
         demo: ['Demo source · not live service', 'Demo data cannot establish a real service trend. Live counts and comparisons are hidden.']
       };
-      const notice = el('div', 'frallan-trend-notice', undefined, card);
+      if (availability !== 'ready') {
+        const caption = availability === 'warming-up' ?
+          'Building comparison · ' + Math.min(5, data ? data.observedMinutes : 0).toFixed(1) + '/5 min observed' :
+          notices[availability][0];
+        el('p', 'frallan-trend-caption', caption, card);
+      }
+      card.append(details);
+      const notice = el('div', 'frallan-trend-notice', undefined, detailsBody);
       el('span', 'frallan-trend-notice-icon' + (current ? '' : ' frallan-trend-notice-icon-info'), current ? '◷' : 'i', notice).setAttribute('aria-hidden', 'true');
       const noticeText = el('div', '', undefined, notice);
       el('strong', '', notices[availability][0], noticeText);
       el('p', '', notices[availability][1], noticeText);
-      const footer = el('div', 'frallan-trend-footer', undefined, card);
+      const footer = el('div', 'frallan-trend-footer', undefined, detailsBody);
       const lastAt = data && data.updatedAt || shown && shown.updatedAt;
       const lastAge = lastAt ? Math.max(0, (now - Date.parse(lastAt)) / 1000) : null;
       const freshness = lastAt ? (current ? 'Source ' : 'Last observed ') + new Date(lastAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) +
         ' · ' + (lastAge < 60 ? Math.floor(lastAge) + 's' : Math.floor(lastAge / 60) + 'm') + ' ago' : 'No source timestamp';
+      detailsToggle.textContent = 'Details · ' + (lastAt ?
+        (current ? 'updated ' : 'last observed ') + (lastAge < 60 ? Math.floor(lastAge) + 's' : Math.floor(lastAge / 60) + 'm') + ' ago' :
+        'no live timestamp');
       el('span', '', freshness + ' · checks every 15s', footer);
       const retry = el('button', 'frallan-trend-refresh', 'Refresh', footer);
       retry.type = 'button';
       retry.addEventListener('click', refresh);
       if (restoreFocus) retry.focus({ preventScroll: true });
-      if (reason) el('p', 'frallan-trend-reason', 'Status: ' + reason, card);
+      if (restoreDetailsFocus) detailsToggle.focus({ preventScroll: true });
+      if (reason) el('p', 'frallan-trend-reason', 'Status: ' + reason, detailsBody);
     }
 
     function schedule() {

@@ -47,3 +47,7 @@ Before delivering UI that reads another team: serve our tile files locally and p
 When another team's asset or route is not live yet, write consumer code that treats only the exact 404/missing
 asset as "not yet" (keep the fallback) and runs the real path the moment it ships. No manual flag. Test the real
 path early by serving a fake of their asset with the preview harness (OVERRIDE_DIR).
+
+## Prove the consumer read the field (spore backend-11)
+A 200 or a passing test does not prove the field is used. After a producer releases a field, screenshot the real
+deployed path with live data and check the visible output changes (track column appears, notices strip fills).
