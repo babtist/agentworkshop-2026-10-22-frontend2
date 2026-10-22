@@ -5,6 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Model, parseResponse, parseStations, parsePositions, parseNotices, activeNotices, demoItems, validThresholds, DEFAULT_THRESHOLDS } = require('./model');
+const { createMetro } = require('./metro');
 
 const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
 const MAX_DISPLAYS = 500;
@@ -23,6 +24,8 @@ const FALLBACK_STATIONS = new Map([['Sci', { name: 'Stockholm City', lat: 59.330
 const UPSTREAM_URL = process.env.TRAFIKVERKET_URL || 'https://api.trafikinfo.trafikverket.se/v2/data.json';
 
 const model = new Model();
+// Tunnelbanan from SL: its own paced loop and its own /api/metro/... routes, independent of the commuter model.
+const metro = createMetro();
 const displays = new Map();
 const streams = new Set();
 const stations = { coords: new Map(), loadedAt: 0, attemptAt: 0 };
@@ -391,6 +394,8 @@ module.exports = {
   _pollNow: tick,
   // Test hook: run one position round now. Not part of the HTTP contract.
   _pollPositionsNow: positionTick,
+  // Test hook: the metro loop (createMetro instance). Not part of the HTTP contract.
+  _metro: metro,
 
   init(ctx) {
     state.displaysFile = path.join(ctx.dataDir, 'displays.json');
@@ -406,6 +411,7 @@ module.exports = {
       for (const s of streams) { try { s.res.write(': ping\n\n'); } catch { streams.delete(s); } }
     }, 25000);
     if (state.ping.unref) state.ping.unref();
+    if (process.env.BABTIST_METRO !== 'off') metro.start();
   },
 
   async handle(req, res, ctx) {
@@ -430,6 +436,11 @@ module.exports = {
     }
 
     if (req.method === 'GET' && p === '/api/trains') return json(res, 200, trainsBody());
+
+    if (req.method === 'GET' && p.startsWith('/api/metro/')) {
+      const out = metro.route(p, params, thresholdsOf);
+      if (out) return json(res, out[0], out[1]);
+    }
 
     if (req.method === 'GET' && p === '/api/stations') {
       const id = params.get('displayId') || 'default';
