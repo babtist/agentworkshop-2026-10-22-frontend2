@@ -23,6 +23,9 @@ You try to break the controller and prove the requirements from `PROJEKT.md` and
 2. Run `node --test projects/babtist/test/controller.test.js` from the repo root.
 3. When another team's real UI calls us, test against their real module and report with `@<team>` in `#build`:
    what was sent, what was expected, what came back. Never edit their folders.
+4. When a consumer's PR and ours are both open, cross-test before the release round: `git fetch origin
+   pull/N/head:prN` and `git worktree add /tmp/prN prN`, point their page or tests at our local plugin, then remove
+   the worktree and branch. (from spore platforms-21, team pisak)
 
 ## Live meaning check (after every deploy)
 
@@ -31,7 +34,7 @@ bugs today were found only by looking at live output: Sollentuna red from trains
 lingering an hour in `/next`, and `upstream: "no-key"` right after a restart. After every release:
 
 1. Run `node --test projects/babtist/test/*.test.js` (all files; a directory argument fails).
-2. Fetch the live `/api/status`, `/api/stations`, `/api/trains` and a busy station's `/next`, and ask of each
+2. Fetch the live `/api/status`, `/api/stations`, `/api/trains`, a busy station's `/next` and `/api/notices`, and ask of each
    red/orange/late/canceled value: would a person standing on that platform right now agree? Look for counts
    driven by old rows, entries in the past, and states that only exist during startup.
 3. Report a mismatch as a contract question to the CEO (it is a meaning change, announced in `#build`), not as a
