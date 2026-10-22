@@ -147,3 +147,18 @@ test('the API key never reaches the response', async () => {
   const { text } = await get('/api/stations?displayId=hall-1');
   assert.ok(!text.includes('test-key-not-real'));
 });
+
+test('station colour only counts stops within the last 15 min or later; older-only stations stay, as ok', () => {
+  const { Model } = require('../../../board/plugins/babtist/model.js');
+  const m = new Model();
+  const now = Date.now();
+  const at = min => new Date(now + min * 60000).toISOString();
+  const row = (train, loc, schedMin, actMin) => ({ AdvertisedTrainIdent: train, LocationSignature: loc, ActivityType: 'Avgang',
+    AdvertisedTimeAtLocation: at(schedMin), TimeAtLocation: actMin == null ? undefined : at(actMin) });
+  m.apply([row('801', 'Sol', -55, -49), row('802', 'Sol', -48, -42), row('803', 'Sol', -20, -10), row('804', 'Old', -50, -40)], { now });
+  const by = Object.fromEntries(m.stationsFor({ trains: 3, minutes: 5 }, now).map(s => [s.station, s]));
+  assert.strictEqual(by.Sol.lateCount, 1);
+  assert.strictEqual(by.Sol.level, 'warning');
+  assert.strictEqual(by.Old.lateCount, 0);
+  assert.strictEqual(by.Old.level, 'ok');
+});

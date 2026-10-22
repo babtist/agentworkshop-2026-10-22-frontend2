@@ -123,6 +123,9 @@ default thresholds, a bad id gets `400`).
   station's rows, in whole minutes, never negative. If a train has both an arrival and a departure row at the station,
   the larger delay counts. A train with neither actual nor estimate at the station has no delay there.
 - `lateCount` = distinct trains (by `trainId`) whose delay at that station is >= the display's `minutes`.
+  **Only stops that happen now or happened in the last 15 minutes count** (time = actual, else estimated, else
+  scheduled), so the colour shows the situation now, not trains that passed an hour ago. `canceledCount` uses the
+  same 15-minute rule. A station whose stops are all older still appears, as `ok`.
 - `canceledCount` = distinct trains with a canceled row at the station. Canceled trains are never also counted as late.
 - Per-station `level` uses the display's `trains` threshold X directly (not the `2 * X` of `/api/status`):
   - `ok`: `lateCount == 0`

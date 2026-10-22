@@ -4,6 +4,7 @@
 const WINDOW_PAST_MS = 60 * 60 * 1000;
 const WINDOW_FUTURE_MS = 30 * 60 * 1000;
 const NEXT_STALE_MS = 5 * 60 * 1000;
+const STATION_RECENT_MS = 15 * 60 * 1000;
 const DEFAULT_THRESHOLDS = { trains: 3, minutes: 5 };
 // Rows of one ident further apart than this are different runs (the same ident recurs the next day).
 const RUN_GAP_MS = 12 * 60 * 60 * 1000;
@@ -176,8 +177,11 @@ class Model {
     const stations = new Map();
     for (const r of this.rows.values()) {
       if (!r.loc) continue;
+      // Station colour reflects "now": only stops that happen(ed) within the last 15 min or later count.
       let s = stations.get(r.loc);
       if (!s) { s = new Map(); stations.set(r.loc, s); }
+      const when = r.act != null ? r.act : r.est != null ? r.est : r.adv;
+      if (when < now - STATION_RECENT_MS) continue;
       const id = this.trainIdOf(r);
       let t = s.get(id);
       if (!t) { t = { canceled: false, delay: null }; s.set(id, t); }
