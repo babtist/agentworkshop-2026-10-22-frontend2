@@ -279,14 +279,130 @@ Body: `{ updatedAt, upstream, count, notices }`.
 { "ok": true, "upstream": "ok", "trainsTracked": 37, "displays": 2, "streams": 1, "lastPollAt": "2026-10-22T10:05:12.000Z" }
 ```
 
+## Tunnelbanan (metro)
+
+A second, independent source: the Stockholm metro from SL's open Transport and Deviations APIs (no key). Metro lives
+only under `/api/metro/...`; the commuter routes above, their fields and their meaning are unchanged, and metro
+trains never show up in them (or the other way round). Thresholds are the same per-display thresholds
+(`PUT /api/displays/:id`), with the same level rule.
+
+### Metro model
+
+- A metro **train** is one SL `journey.id` on one line. The same journey seen at several stations is one train.
+- Its **delay** comes from its next stop: of all its departures (across stations) that are not `DEPARTED` and not more
+  than 1 min overdue, the one with the earliest expected time. If it has none, its latest past departure.
+  `delaySeconds = max(0, expected - scheduled)` in whole seconds; `delayMinutes = round(delaySeconds / 60)`, the same
+  rounding as the commuter routes, so a `minutes` threshold means the same for both sources.
+- A train is **canceled** when any of its departures has `state` `CANCELLED`, `INHIBITED` or `REPLACED`. Canceled trains
+  count in `canceledCount`, never as late.
+- Late and level: as in the delay model above (`late` = `delayMinutes >= minutes`; `ok` / `warning` / `severe` from
+  `lateCount` vs `trains` and `2 * trains`).
+- Freshness: each station keeps only its latest fetched departures (≤ 30 min ahead); departures more than 15 min in the
+  past are dropped. A train counts while it has any kept departure.
+- `upstream` for transport data: `starting` until the first station has been fetched; then `ok` while the latest SL
+  call succeeded; `error` when the latest call failed or the loop is backing off. Never `no-key`.
+  For `/api/metro/notices` it is the state of the latest deviations call (`starting` / `ok` / `error`).
+- SL times are Stockholm local time without zone; the controller converts them, every time here is ISO UTC.
+
+### Polling (fair use)
+
+- One shared loop, one SL call per step, about one step per second (`BABTIST_METRO_STEP_MS`, default 1000, min 250).
+  Steps go round-robin over the ~100 metro stations, so each station is refreshed about every 100 s. Client requests
+  never cause SL calls.
+- Station list (`/v1/stop-points` + `/v1/sites`): at start, then once per 24 h; retried at most every 10 min.
+  One site per metro stop area (105 sites on 2026-10-22). Deviations: at most once a minute.
+- On HTTP 429 or 5xx the loop pauses 60 s, doubling up to 10 min, and resets after a successful call.
+- `BABTIST_METRO=off` turns the metro loop off (routes then answer `starting` with empty lists).
+
+### `GET /t/babtist/api/metro/status?displayId=<id>`
+
+Like `/api/status`, plus `mode`, `stationsCovered` (stations fetched in the last 5 min) and `stationsTotal`.
+
+```json
+{
+  "displayId": "default", "mode": "metro", "level": "ok", "lateCount": 0, "canceledCount": 1, "trainsTracked": 97,
+  "maxDelayMinutes": 2, "thresholds": { "trains": 3, "minutes": 5 }, "updatedAt": "2026-10-22T11:10:56.205Z",
+  "upstream": "ok", "stationsCovered": 105, "stationsTotal": 105
+}
+```
+
+### `GET /t/babtist/api/metro/lines?displayId=<id>`
+
+Per metro line, sorted by line number. The seven lines 10, 11, 13, 14, 17, 18, 19 are always listed (`trains: 0` at
+night). `color` is `blue`, `red`, `green` (from SL's line group), else `null`. `level` uses the display's thresholds
+for that line's trains alone.
+
+```json
+{
+  "displayId": "default", "updatedAt": "2026-10-22T11:10:56.205Z", "upstream": "ok",
+  "thresholds": { "trains": 3, "minutes": 5 },
+  "lines": [
+    { "line": "10", "group": "Tunnelbanans blå linje", "color": "blue", "trains": 10, "lateCount": 0, "canceledCount": 0, "maxDelayMinutes": 0, "level": "ok" },
+    { "line": "17", "group": "Tunnelbanans gröna linje", "color": "green", "trains": 13, "lateCount": 0, "canceledCount": 1, "maxDelayMinutes": 1, "level": "ok" }
+  ]
+}
+```
+
+### `GET /t/babtist/api/metro/stations`
+
+The metro stations (SL sites), sorted by `siteId`. `fetchedAt` is when that station's departures were last fetched
+(`null` = not yet).
+
+```json
+{
+  "updatedAt": "2026-10-22T11:10:56.205Z",
+  "stations": [ { "siteId": 9001, "name": "T-Centralen", "lat": 59.3313754, "lon": 18.0604334, "fetchedAt": "2026-10-22T11:10:31.002Z" } ]
+}
+```
+
+### `GET /t/babtist/api/metro/stations/:siteId/next?limit=<n>`
+
+The next metro departures at one station, sorted by expected time; departed ones and ones more than 1 min overdue
+are left out. `siteId`: 1..7 digits, else `400`. `limit`: 1..30, default 10, else `400`. Unknown site: `200`, empty
+list, `name` = the id as a string, `updatedAt: null`. `updatedAt` is that station's fetch time. Delay and `canceled`
+are for this departure. `platform` is SL's platform designation or `null`; `deviations` are SL's texts for this
+departure.
+
+```json
+{
+  "siteId": 9001, "name": "T-Centralen", "updatedAt": "2026-10-22T11:10:31.002Z", "upstream": "ok", "count": 1,
+  "trains": [
+    { "journeyId": "2026102220437", "line": "13", "group": "Tunnelbanans röda linje", "destination": "Ropsten",
+      "scheduled": "2026-10-22T11:10:30.000Z", "expected": "2026-10-22T11:10:58.000Z", "delaySeconds": 28,
+      "delayMinutes": 0, "canceled": false, "state": "ATSTOP", "platform": "3", "deviations": [] }
+  ]
+}
+```
+
+### `GET /t/babtist/api/metro/notices`
+
+SL's current metro disruption messages: only those active now (`start <= now < end`), one per SL case id, Swedish
+text (whitespace collapsed). `priority` from SL `importance_level`: 7..9 `high`, 4..6 `normal`, 0..3 `low`. Sorted
+high first, then newest first. `lines` are line designations, `stations` stop-area names; `end` may be `null`.
+
+```json
+{
+  "updatedAt": "2026-10-22T11:10:12.000Z", "upstream": "ok", "count": 1,
+  "notices": [
+    { "id": "12990563", "header": "Avstängd hiss vid Odenplan", "text": "Odenplan: Hissen ... är avstängd.",
+      "priority": "low", "lines": ["17", "18", "19"], "stations": ["Odenplan"],
+      "start": "2026-10-16T10:35:15.630Z", "end": "2026-10-23T11:34:00.000Z" }
+  ]
+}
+```
+
 ## Guarantees
 
-- Exactly one upstream poll loop, no matter how many displays or browsers connect.
+- Two sources, each with exactly one shared poll loop, no matter how many displays or browsers connect: Trafikverket
+  (commuter trains, `/api/...`) and SL (metro, `/api/metro/...`). They are independent: one failing never changes the
+  other's routes or `upstream`.
 - Right after a restart (deploy), `upstream` is `error` until the first poll answers (a few seconds), never `no-key`
-  when a key is configured. Clients should keep their last data while `upstream` is not `ok`.
+  when a key is configured. Metro routes say `starting` instead until the first station is fetched. Clients should
+  keep their last data while `upstream` is not `ok`.
 - Only the commuter-train rows needed for the current delays, a station list (signature, name, coordinates), the
-  current station notices and the latest position per tracked train are kept, in memory. Only display thresholds are
-  written to disk.
+  current station notices and the latest position per tracked train are kept, in memory; for the metro only the
+  station list (id, name, coordinates), each station's latest departures and the current SL messages. Only display
+  thresholds are written to disk.
 - Errors: `400` bad input, `404` unknown route/display, `429` too many streams/displays. Body `{ "error": "..." }`.
 
 ## Changes

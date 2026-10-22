@@ -22,5 +22,19 @@ You own `board/plugins/babtist/` (`index.js` = HTTP + upstream polling, `model.j
 ## Workflow
 
 1. Change `model.js` for logic, `index.js` for wiring.
-2. Run `node --test projects/babtist/test/controller.test.js` from the repo root.
+2. Run `node --test projects/babtist/test/*.test.js` from the repo root (all files).
 3. Deliver with `tools/pr.sh babtist "<one line>"`.
+
+## Second source: SL Transport API (Tunnelbanan, proposed 13:00)
+
+Trafikverket has no metro. For the metro use SL's open API on Trafiklab (no key, fair use, no published rate limit):
+
+- `GET https://transport.integration.sl.se/v1/sites/<siteId>/departures?transport=METRO&forecast=30`: per station,
+  each departure has `line.designation`, `destination`, `scheduled`, `expected` (local time, no zone), `state` and a
+  `journey.id`. Merge the same `journey.id` across stations into one train, like a commuter run.
+- Metro stations: `/v1/stop-points` gives stop areas with `stop_area.type === "METROSTN"`; `/v1/sites?expand=true`
+  maps them to site ids (T-Centralen = 9001). Both are big (1.6 MB and 8 MB): fetch once a day, keep only the ids.
+- Load: about 100 stations, so poll round-robin at about 1 call per second, never all at once. Back off on 429 or 5xx.
+  Still one shared loop: clients never cause SL calls.
+- Disruptions: `https://deviations.integration.sl.se/v1/messages?transport_mode=METRO`, once a minute at most.
+- Metro routes live under `/api/metro/...` and never change the commuter routes.

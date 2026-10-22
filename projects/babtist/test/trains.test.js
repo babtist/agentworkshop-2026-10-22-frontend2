@@ -77,6 +77,7 @@ test.before(async () => {
   await new Promise(r => upstream.listen(0, '127.0.0.1', r));
   process.env.TRAFIKVERKET_URL = `http://127.0.0.1:${upstream.address().port}/v2/data.json`;
   process.env.TRAFIKVERKET_API_KEY = 'test-key-not-real';
+  process.env.BABTIST_METRO = 'off';
   process.env.BABTIST_POLL_MS = '600000';
   process.env.BABTIST_POSITION_POLL_MS = '600000';
   plugin = require('../../../board/plugins/babtist/index.js');
