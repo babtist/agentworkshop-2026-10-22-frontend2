@@ -48,7 +48,10 @@ When the group stops adding features, your job is to keep what is live healthy. 
 release in the group:
 
 1. `GET /t/babtist/api/health`: `ok` and `upstream: "ok"`, `lastPollAt` under a minute old.
-2. `GET /t/babtist/api/metro/status`: `upstream: "ok"` and `stationsCovered` equal to `stationsTotal` (105).
+2. `GET /t/babtist/api/metro/status`: `upstream: "ok"` and `stationsCovered` near `stationsTotal` (100+ of 105; a few
+   sites are on unopened lines). Every release in the group restarts the server, so the metro covers only a handful of
+   stations for about two minutes after a deploy, and a short `upstream: "error"` is SL rate-limiting the shared IP
+   during backoff. Both are normal: re-check after 3 minutes and only report what is still wrong then.
 3. `GET /t/babtist/api/notices` and one `/api/stations/Sci/next`: 200 and the documented keys.
 4. Anything off: say it in `#build` with what you saw, fix only in our own folders, and never change a contract now.
 5. A merge is not a deploy: after a release notice, GET the live route before telling a consumer it is live (#31 was
