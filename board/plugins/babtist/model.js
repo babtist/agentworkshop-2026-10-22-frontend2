@@ -77,6 +77,31 @@ function parsePositions(json) {
   return out;
 }
 
+// Trafikverket Deviation / OtherInformation: [{ Code, Description }] (older schemas: plain strings).
+function infoList(v) {
+  if (!Array.isArray(v)) return [];
+  const out = [];
+  for (const d of v) {
+    const text = typeof d === 'string' ? d : d && typeof d.Description === 'string' ? d.Description : null;
+    if (!text || !text.trim()) continue;
+    out.push({ code: d && typeof d.Code === 'string' ? d.Code : null, text: text.replace(/\s+/g, ' ').trim().slice(0, 300) });
+  }
+  return out;
+}
+
+// Platform and service information for one train at one station: departure row first, then arrival.
+function stopInfo(arr, dep) {
+  const rows = [dep, arr].filter(Boolean);
+  const deviations = [], notes = [];
+  for (const r of rows) {
+    for (const d of r.deviations || []) if (!deviations.some(x => x.code === d.code && x.text === d.text)) deviations.push(d);
+    for (const n of r.notes || []) if (!notes.includes(n)) notes.push(n);
+  }
+  const track = (rows.find(r => r.track) || {}).track || null;
+  const trackChanged = deviations.some(d => d.code === 'ANA055' || /spårändr/i.test(d.text));
+  return { track, trackChanged, deviations, notes };
+}
+
 class Model {
   constructor() {
     this.rows = new Map();
@@ -120,6 +145,9 @@ class Model {
         act: toMs(a.TimeAtLocation),
         est: toMs(a.EstimatedTimeAtLocation),
         canceled: !!a.Canceled,
+        track: typeof a.TrackAtLocation === 'string' && a.TrackAtLocation.trim() ? a.TrackAtLocation.trim() : null,
+        deviations: infoList(a.Deviation).map(d => ({ code: d.code, text: d.text })),
+        notes: infoList(a.OtherInformation).map(d => d.text),
       });
     }
     this.summarize(now);
@@ -300,6 +328,7 @@ class Model {
         expected,
         delayMinutes: minutes(delay),
         canceled: run.canceled,
+        ...stopInfo(arr, dep),
       });
     }
     out.sort((a, b) => a.expected - b.expected || (a.train < b.train ? -1 : a.train > b.train ? 1 : 0));

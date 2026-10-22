@@ -61,6 +61,9 @@ function buildQuery(key, changeId) {
     <INCLUDE>TimeAtLocation</INCLUDE>
     <INCLUDE>Canceled</INCLUDE>
     <INCLUDE>ToLocation</INCLUDE>
+    <INCLUDE>TrackAtLocation</INCLUDE>
+    <INCLUDE>Deviation</INCLUDE>
+    <INCLUDE>OtherInformation</INCLUDE>
   </QUERY>
 </REQUEST>`;
 }

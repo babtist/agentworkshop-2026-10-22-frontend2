@@ -97,7 +97,7 @@ test('shape, names and sorting by expected', async () => {
   assert.deepStrictEqual(body.trains.map(t => t.train), ['11', '13', '15', '10', '16', '17']);
   assert.strictEqual(body.count, 6);
   for (const t of body.trains) {
-    assert.deepStrictEqual(Object.keys(t), ['trainId', 'train', 'to', 'arrival', 'departure', 'expected', 'delayMinutes', 'canceled']);
+    assert.deepStrictEqual(Object.keys(t), ['trainId', 'train', 'to', 'arrival', 'departure', 'expected', 'delayMinutes', 'canceled', 'track', 'trackChanged', 'deviations', 'notes']);
     assert.match(t.trainId, new RegExp(`^${t.train}-\\d{4}-\\d{2}-\\d{2}$`));
   }
   const ex = body.trains.map(t => Date.parse(t.expected));
@@ -192,4 +192,24 @@ test('entries more than 5 minutes overdue are dropped (canceled stops never get 
     AdvertisedTimeAtLocation: new Date(now - minAgo * 60000).toISOString(), Canceled: canceled, ToLocation: [{ LocationName: 'Abc' }] });
   m.apply([row('901', 20, true), row('902', 3, true), row('903', -5, false)], { now });
   assert.deepStrictEqual(m.nextAt('Xyz', now, 10).map(t => t.train), ['902', '903']);
+});
+
+test('track, trackChanged, deviations and notes: departure first, deduplicated, honest when missing', () => {
+  const { Model } = require('../../../board/plugins/babtist/model.js');
+  const m = new Model();
+  const now = Date.now();
+  const t = min => new Date(now + min * 60000).toISOString();
+  m.apply([
+    { AdvertisedTrainIdent: '911', LocationSignature: 'Xyz', ActivityType: 'Ankomst', AdvertisedTimeAtLocation: t(5), TrackAtLocation: '1',
+      Deviation: [{ Code: 'ANA034', Description: 'Fordonsfel' }], OtherInformation: [{ Code: 'ONA', Description: 'Stannar ej vid  Jordbro.' }] },
+    { AdvertisedTrainIdent: '911', LocationSignature: 'Xyz', ActivityType: 'Avgang', AdvertisedTimeAtLocation: t(6), TrackAtLocation: '2',
+      Deviation: [{ Code: 'ANA055', Description: 'Spårändrat' }, { Code: 'ANA034', Description: 'Fordonsfel' }], OtherInformation: [{ Description: 'Stannar ej vid  Jordbro.' }] },
+    { AdvertisedTrainIdent: '912', LocationSignature: 'Xyz', ActivityType: 'Avgang', AdvertisedTimeAtLocation: t(8) },
+  ], { now });
+  const [a, b] = m.nextAt('Xyz', now, 10);
+  assert.strictEqual(a.track, '2');
+  assert.strictEqual(a.trackChanged, true);
+  assert.deepStrictEqual(a.deviations, [{ code: 'ANA055', text: 'Spårändrat' }, { code: 'ANA034', text: 'Fordonsfel' }]);
+  assert.deepStrictEqual(a.notes, ['Stannar ej vid Jordbro.']);
+  assert.deepStrictEqual([b.track, b.trackChanged, b.deviations, b.notes], [null, false, [], []]);
 });

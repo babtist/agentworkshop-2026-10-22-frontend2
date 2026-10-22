@@ -162,12 +162,24 @@ call. `:station` is the station signature from `/api/stations` (URL-encoded, e.g
       "departure": { "scheduled": "2026-10-22T11:16:00.000Z", "estimated": "2026-10-22T11:20:00.000Z" },
       "expected": "2026-10-22T11:20:00.000Z",
       "delayMinutes": 4,
-      "canceled": false
+      "canceled": false,
+      "track": "2",
+      "trackChanged": true,
+      "deviations": [{ "code": "ANA055", "text": "Spårändrat" }, { "code": "ANA034", "text": "Fordonsfel" }],
+      "notes": ["Stannar ej vid Jordbro."]
     }
   ]
 }
 ```
 
+- `track` (string, agreed with peter and frallan): the platform from Trafikverket `TrackAtLocation`, departure row
+  first; `null` when unknown (never a guess). `trackChanged` is `true` when a deviation says the track changed
+  (code `ANA055` / "Spårändrat").
+- `deviations` `[{ code, text }]` (Trafikverket `Deviation`, `code` may be `null`) and `notes` `[text]`
+  (`OtherInformation`, e.g. "Stannar ej vid Jordbro.", "Tågbyte vid Tumba."): service information for this stop,
+  arrival and departure merged, deduplicated, whitespace collapsed, at most 300 characters each, empty arrays when
+  there is none. Plain text from Trafikverket: render it as text, never as HTML. A deviation is service
+  information, not a proven cause of the delay. Same shared query as before, no extra upstream calls.
 - One entry per train run that has not yet left the station: its departure (or, at a terminus, its arrival) has no
   actual time yet. Only what is in the model window (up to 30 min ahead), so the list can be shorter than `limit`.
   Entries whose `expected` is more than 5 minutes in the past are dropped (canceled stops never get an actual time).
