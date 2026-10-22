@@ -23,6 +23,8 @@ You own `board/plugins/babtist/` (`index.js` = HTTP + upstream polling, `model.j
 
 1. Change `model.js` for logic, `index.js` for wiring.
 2. Run `node --test projects/babtist/test/*.test.js` from the repo root (all files).
+   Then `node --check` every file in `board/plugins/babtist/`: a broken merge makes the plugin vanish silently on the
+   server, with every route 404. (from spore backend-13, team be-christian)
 3. Deliver with `tools/pr.sh babtist "<one line>"`.
 
 ## Second source: SL Transport API (Tunnelbanan, proposed 13:00)
