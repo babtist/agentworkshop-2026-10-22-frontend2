@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Commuter-train delays</title>
+<link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -17,6 +18,11 @@
 
   <div id="grid"></div>
 
+  <section id="mapSection">
+    <div id="map" role="region" aria-label="Map of commuter stations coloured by delay level"></div>
+    <div id="mapNote" class="map-note">Loading stations…</div>
+  </section>
+
   <details id="settings">
     <summary>Thresholds for display <b id="settingsFor"></b></summary>
     <form id="thresholds">
@@ -31,4 +37,7 @@
   </details>
 </main>
 <script src="app.js"></script>
+<script src="risk.js"></script>
+<script src="vendor/leaflet.js"></script>
+<script src="map.js"></script>
 </body></html>

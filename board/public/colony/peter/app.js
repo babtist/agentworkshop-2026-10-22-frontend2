@@ -23,6 +23,7 @@
 
   document.body.classList.toggle('kiosk', kiosk);
   document.body.classList.toggle('wall', wall);
+  if (!wall) document.body.dataset.displayId = ids[0];
 
   // ---------- one card per display ----------
   function makeCard(id) {
@@ -195,6 +196,7 @@
         if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
         $('saveMsg').textContent = `Saved for "${j.id}".`;
         c.poll();
+        window.dispatchEvent(new Event('peter:thresholds'));
       } catch (err) {
         $('saveMsg').textContent = `Not saved: ${err.message}`;
       }

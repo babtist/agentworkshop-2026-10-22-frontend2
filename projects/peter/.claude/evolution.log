@@ -3,3 +3,4 @@
 2026-10-22 10:20 MUTATE: hive + _template (removed model lines, spore frontend2-1: model sonnet fails in Copilot CLI)
 2026-10-22 10:22 SPAWN: module-integration-check (awaken: babtist live, frallan proposing a risk contract to us; need consumer-side contract checks)
 2026-10-22 10:35 EVOLVE: delay-display-ui energy 60->70 (shipped PR #5); module-integration-check holds 50 (awaits frallan); no spawn/merge/dissolve needed
+2026-10-22 10:38 SPAWN: station-delay-map (re-awaken: babtist added /api/stations; Leaflet map layer is a new frontend skill)

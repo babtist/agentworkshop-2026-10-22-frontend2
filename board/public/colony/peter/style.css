@@ -55,7 +55,7 @@ body.kiosk header, body.kiosk #settings { display: none; }
 body.kiosk main { max-width: none; padding: 2vmin; }
 body.kiosk #grid { margin: 0; min-height: 96vh; }
 body.kiosk .card { display: flex; flex-direction: column; justify-content: center; }
-body.kiosk:not(.wall) .level { font-size: 12vmin; }
+body.kiosk:not(.wall) .level { font-size: 8vmin; }
 body.kiosk:not(.wall) .summary { font-size: 3vmin; }
 body.kiosk:not(.wall) .stats b { font-size: 7vmin; }
 body.kiosk:not(.wall) .stats span { font-size: 2vmin; }
@@ -63,3 +63,32 @@ body.kiosk:not(.wall) .trend svg { height: 14vmin; }
 body.kiosk.wall .level { font-size: 5vmin; }
 
 @media (max-width: 460px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+
+/* Station map (single display only) */
+#mapSection { margin: 0 0 14px; }
+body.wall #mapSection { display: none; }
+#map { height: 340px; border-radius: 14px; border: 1px solid #1d2a45; background: #0c1324; }
+.map-note { font-size: 12px; color: #8a98b3; margin-top: 4px; text-align: center; }
+.map-legend { background: #070b16dd; color: #e9eef7; padding: 4px 8px; border-radius: 6px; font: 12px system-ui, sans-serif; display: flex; gap: 10px; }
+.map-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+.leaflet-tooltip { font: 12px system-ui, sans-serif; }
+
+/* Kiosk with one display: level card and map side by side */
+body.kiosk:not(.wall) main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 2vmin; }
+body.kiosk:not(.wall) #mapSection { margin: 0; display: flex; flex-direction: column; }
+body.kiosk:not(.wall) #map { flex: 1; height: auto; min-height: 90vh; }
+@media (max-width: 900px) { body.kiosk:not(.wall) main { grid-template-columns: 1fr; } }
+
+/* Ripple-risk advisory (frallan): visually secondary to the level card, never green unless ready */
+.risk { padding: 10px 14px; border-radius: 12px; border: 1px dashed; text-align: center; }
+.risk-head { font-size: 12px; color: #8a98b3; letter-spacing: .1em; text-transform: uppercase; }
+.risk-tag { border: 1px solid #8a98b3; border-radius: 4px; padding: 0 4px; margin-right: 4px; font-size: 10px; }
+.risk-level { font-size: 20px; font-weight: 700; }
+.risk-detail { font-size: 13px; color: #c7d0e0; }
+.risk-reasons { margin: 4px 0 0; padding: 0; list-style: none; font-size: 12px; color: #8a98b3; }
+.risk-none    { border-color: #2a3a5c; background: #0c1324; } .risk-none .risk-level { color: #8a98b3; font-size: 15px; }
+.risk-ok      { border-color: #5fd7a7; } .risk-ok .risk-level { color: #5fd7a7; }
+.risk-warning { border-color: #ffb454; } .risk-warning .risk-level { color: #ffb454; }
+.risk-severe  { border-color: #ff5c6c; } .risk-severe .risk-level { color: #ff5c6c; }
+body.kiosk:not(.wall) .risk-level { font-size: 3.5vmin; }
+body.kiosk:not(.wall) #grid { grid-template-rows: 1fr auto; }

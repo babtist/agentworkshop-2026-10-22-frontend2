@@ -1,0 +1,7 @@
+# FLUX Evolution Log
+2026-10-22 09:54 MIGRATE: switched from Agent Factory to FLUX at the user's request; preserved team identity, board skills and hooks
+2026-10-22 10:13 EXPLORE: ripple-20261022, three initial solver specifications: clustering, headway overlap, network graph (input agreement pending; fitness unevaluated)
+2026-10-22 10:13 REPAIR: removed unsupported opus model override after invocation failed; integrated shared-poller test pattern from spore frontend2-2 into testing gene
+2026-10-22 10:41 EVOLVE: ripple alpha gen-002 constrains clustering to observed disruption and strengthens freshness/cap checks (deployed snapshot evidence; runtime fitness unmeasured)
+2026-10-22 10:41 EVOLVE: ripple beta gen-002 uses exact destination sets as an advisory proxy, never physical direction (agreed snapshot lacks explicit direction; runtime fitness unmeasured)
+2026-10-22 10:41 EVOLVE: ripple gamma gen-002 gates graph implementation on verified topology (routes absent; runtime fitness unmeasured)
