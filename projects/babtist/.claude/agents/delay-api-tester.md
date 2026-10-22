@@ -51,3 +51,5 @@ release in the group:
 2. `GET /t/babtist/api/metro/status`: `upstream: "ok"` and `stationsCovered` equal to `stationsTotal` (105).
 3. `GET /t/babtist/api/notices` and one `/api/stations/Sci/next`: 200 and the documented keys.
 4. Anything off: say it in `#build` with what you saw, fix only in our own folders, and never change a contract now.
+5. A merge is not a deploy: after a release notice, GET the live route before telling a consumer it is live (#31 was
+   merged but still 404 for a minute). (from spore platforms-28, team platforms-tp)
