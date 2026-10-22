@@ -55,6 +55,26 @@ function parseStations(json) {
   return out;
 }
 
+// TrainPosition response -> [{ train, lat, lon, bearing, at (ms), deleted }]. Throws on an upstream error.
+function parsePositions(json) {
+  const result = json && json.RESPONSE && json.RESPONSE.RESULT && json.RESPONSE.RESULT[0];
+  if (!result) throw new Error('unexpected response shape');
+  if (result.ERROR) throw new Error('upstream error: ' + (result.ERROR.MESSAGE || 'unknown'));
+  const out = [];
+  for (const p of Array.isArray(result.TrainPosition) ? result.TrainPosition : []) {
+    const train = p && p.Train && p.Train.AdvertisedTrainNumber;
+    if (typeof train !== 'string' || !train) continue;
+    const at = toMs(p.TimeStamp);
+    if (at == null) continue;
+    if (p.Deleted) { out.push({ train, at, deleted: true }); continue; }
+    const pos = parseWgs84(p.Position && p.Position.WGS84);
+    if (!pos) continue;
+    const bearing = Number.isFinite(p.Bearing) ? p.Bearing : null;
+    out.push({ train, lat: pos.lat, lon: pos.lon, bearing, at, deleted: false });
+  }
+  return out;
+}
+
 class Model {
   constructor() {
     this.rows = new Map();
@@ -178,6 +198,57 @@ class Model {
     });
   }
 
+  // Train idents with at least one retained row in the window.
+  trackedTrains(now = Date.now()) {
+    this.summarize(now);
+    const out = new Set();
+    for (const r of this.rows.values()) out.add(r.train);
+    return out;
+  }
+
+  // Per train ident: delay, cancellation, direction and last/next stop of its current run (station signatures).
+  // If an ident has two runs in the window, the run whose rows are closest to now wins.
+  trainsInfo(now = Date.now()) {
+    this.summarize(now);
+    const runs = new Map(); // trainId -> { train, rows, dist }
+    for (const r of this.rows.values()) {
+      const id = this.trainIdOf(r);
+      let run = runs.get(id);
+      if (!run) { run = { train: r.train, trainId: id, rows: [], dist: Infinity }; runs.set(id, run); }
+      run.rows.push(r);
+      run.dist = Math.min(run.dist, Math.abs(r.adv - now));
+    }
+    const best = new Map();
+    for (const run of runs.values()) {
+      const cur = best.get(run.train);
+      if (!cur || run.dist < cur.dist) best.set(run.train, run);
+    }
+    const out = new Map();
+    for (const run of best.values()) {
+      const rows = run.rows.sort((a, b) => a.adv - b.adv);
+      let canceled = false, last = null, estDelay = null;
+      const to = [];
+      for (const r of rows) {
+        if (r.canceled) canceled = true;
+        for (const sig of r.to) if (!to.includes(sig)) to.push(sig);
+        if (r.act != null) { if (!last || r.adv > last.adv || (r.adv === last.adv && r.act > last.act)) last = r; }
+        else if (r.est != null) estDelay = Math.max(estDelay == null ? -Infinity : estDelay, r.est - r.adv);
+      }
+      const ms = last ? last.act - last.adv : estDelay;
+      // The next stop is a different station: a departure row at the station we just arrived at is not "next".
+      const next = rows.find(r => r.act == null && r.loc && (!last || (r.adv > last.adv && r.loc !== last.loc))) || null;
+      out.set(run.train, {
+        trainId: run.trainId,
+        delayMinutes: ms == null ? null : Math.max(0, Math.round(ms / 60000)),
+        canceled,
+        to,
+        lastStation: last && last.loc ? { station: last.loc, at: iso(last.act) } : null,
+        nextStation: next ? { station: next.loc, scheduled: iso(next.adv), estimated: iso(next.est) } : null,
+      });
+    }
+    return out;
+  }
+
   statusFor(thresholds) {
     const { trains, minutes } = thresholds;
     let lateCount = 0, maxDelay = 0;
@@ -225,4 +296,4 @@ function validThresholds(b) {
     Number.isInteger(b.minutes) && b.minutes >= 1 && b.minutes <= 240;
 }
 
-module.exports = { Model, parseResponse, parseStations, parseWgs84, demoItems, levelThresholds, validThresholds, DEFAULT_THRESHOLDS };
+module.exports = { Model, parseResponse, parseStations, parsePositions, parseWgs84, demoItems, levelThresholds, validThresholds, DEFAULT_THRESHOLDS };

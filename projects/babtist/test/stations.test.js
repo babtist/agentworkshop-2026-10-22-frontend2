@@ -38,6 +38,7 @@ const upstream = http.createServer((req, res) => {
   req.on('data', c => { b += c; });
   req.on('end', () => {
     res.setHeader('content-type', 'application/json');
+    if (b.includes('objecttype="TrainPosition"')) return res.end(JSON.stringify({ RESPONSE: { RESULT: [{ TrainPosition: [] }] } }));
     if (b.includes('objecttype="TrainStation"')) {
       stationCalls++;
       stationQuery = b;
@@ -52,9 +53,10 @@ const dataDir = path.join(__dirname, '.data-stations-test');
 let server, base, plugin;
 
 test.before(async () => {
-  await new Promise(r => upstream.listen(0, r));
+  await new Promise(r => upstream.listen(0, '127.0.0.1', r));
   process.env.TRAFIKVERKET_URL = `http://127.0.0.1:${upstream.address().port}/v2/data.json`;
   process.env.TRAFIKVERKET_API_KEY = 'test-key-not-real';
+  process.env.BABTIST_POSITION_POLL_MS = '600000'; // position rounds only via _pollPositionsNow
   process.env.BABTIST_POLL_MS = '600000';
   plugin = require('../../../board/plugins/babtist/index.js');
   fs.mkdirSync(dataDir, { recursive: true });
@@ -63,7 +65,7 @@ test.before(async () => {
     const url = new URL(req.url, 'http://x');
     plugin.handle(req, res, { path: url.pathname.replace('/t/babtist', ''), url }).then(h => { if (!h) { res.writeHead(404); res.end('{}'); } });
   });
-  await new Promise(r => server.listen(0, r));
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${server.address().port}/t/babtist`;
   await new Promise(r => setTimeout(r, 300));
 });

@@ -4,13 +4,16 @@
 
 const fs = require('fs');
 const path = require('path');
-const { Model, parseResponse, parseStations, demoItems, validThresholds, DEFAULT_THRESHOLDS } = require('./model');
+const { Model, parseResponse, parseStations, parsePositions, demoItems, validThresholds, DEFAULT_THRESHOLDS } = require('./model');
 
 const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
 const MAX_DISPLAYS = 500;
 const MAX_STREAMS = 200;
 const FULL_REFRESH_MS = 5 * 60 * 1000;
 const POLL_MS = Math.max(5000, Number(process.env.BABTIST_POLL_MS) || 20000);
+const POSITION_POLL_MS = Math.max(5000, Number(process.env.BABTIST_POSITION_POLL_MS) || 10000);
+const POSITION_MAX_AGE_MS = 5 * 60 * 1000;
+const TRAIN_RE = /^[A-Za-z0-9]{1,10}$/;
 const STATIONS_RETRY_MS = 10 * 60 * 1000;
 const STATIONS_REFRESH_MS = 24 * 60 * 60 * 1000;
 // Demo mode has no key, so no station list: keep one known marker so map UIs have something to draw.
@@ -21,6 +24,9 @@ const model = new Model();
 const displays = new Map();
 const streams = new Set();
 const stations = { coords: new Map(), loadedAt: 0, attemptAt: 0 };
+// Latest position per tracked train number: train -> { lat, lon, bearing, at (ms) }.
+const positions = new Map();
+const posState = { upstream: 'no-key', updatedAt: null, timer: null };
 const state = { upstream: 'no-key', lastPollAt: null, changeId: null, lastFullAt: 0, updatedAt: new Date().toISOString(), displaysFile: null, timer: null, ping: null };
 
 function loadKey() {
@@ -70,6 +76,108 @@ function buildStationQuery(key) {
     <INCLUDE>Geometry.WGS84</INCLUDE>
   </QUERY>
 </REQUEST>`;
+}
+
+function buildPositionQuery(key, trains) {
+  return `<REQUEST>
+  <LOGIN authenticationkey="${key}"/>
+  <QUERY objecttype="TrainPosition" namespace="järnväg.trafikinfo" schemaversion="1.1">
+    <FILTER>
+      <AND>
+        <IN name="Train.AdvertisedTrainNumber" value="${trains.join(',')}"/>
+        <GT name="TimeStamp" value="$dateadd(-0.00:05)"/>
+      </AND>
+    </FILTER>
+    <INCLUDE>Train.AdvertisedTrainNumber</INCLUDE>
+    <INCLUDE>Position.WGS84</INCLUDE>
+    <INCLUDE>TimeStamp</INCLUDE>
+    <INCLUDE>Bearing</INCLUDE>
+    <INCLUDE>Deleted</INCLUDE>
+  </QUERY>
+</REQUEST>`;
+}
+
+function prunePositions(tracked, now = Date.now()) {
+  for (const [train, p] of positions) {
+    if (now - p.at > POSITION_MAX_AGE_MS || !tracked.has(train)) positions.delete(train);
+  }
+}
+
+// Only the trains the model tracks are asked for; no tracked trains means no upstream call.
+async function pollPositions() {
+  const key = loadKey();
+  if (!key) {
+    positions.clear();
+    posState.upstream = 'no-key';
+    posState.updatedAt = new Date().toISOString();
+    return;
+  }
+  const tracked = model.trackedTrains();
+  const trains = [...tracked].filter(t => TRAIN_RE.test(t)).sort();
+  if (trains.length === 0) {
+    prunePositions(tracked);
+    posState.upstream = 'ok';
+    posState.updatedAt = new Date().toISOString();
+    return;
+  }
+  const res = await fetch(UPSTREAM_URL, {
+    method: 'POST',
+    headers: { 'content-type': 'text/xml' },
+    body: buildPositionQuery(key, trains),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error('upstream HTTP ' + res.status);
+  for (const p of parsePositions(await res.json())) {
+    const cur = positions.get(p.train);
+    if (cur && cur.at > p.at) continue;
+    if (p.deleted) positions.delete(p.train);
+    else positions.set(p.train, { lat: p.lat, lon: p.lon, bearing: p.bearing, at: p.at });
+  }
+  prunePositions(tracked);
+  posState.upstream = 'ok';
+  posState.updatedAt = new Date().toISOString();
+}
+
+// One position round. Never throws: a failed round keeps the last positions (they age out after 5 min).
+async function positionTick() {
+  try { await pollPositions(); }
+  catch (err) {
+    posState.upstream = 'error';
+    console.error('[babtist] position poll failed:', err && err.message);
+  }
+}
+
+function schedulePositions(ms) {
+  posState.timer = setTimeout(async () => {
+    try { await positionTick(); } catch (err) { console.error('[babtist] position tick:', err && err.message); }
+    schedulePositions(POSITION_POLL_MS);
+  }, ms);
+  if (posState.timer.unref) posState.timer.unref();
+}
+
+function trainsBody(now = Date.now()) {
+  const info = model.trainsInfo(now);
+  const trains = [];
+  for (const train of [...positions.keys()].sort()) {
+    const p = positions.get(train);
+    const t = info.get(train);
+    if (!t || now - p.at > POSITION_MAX_AGE_MS) continue;
+    const last = t.lastStation, next = t.nextStation;
+    trains.push({
+      trainId: t.trainId,
+      train,
+      lat: p.lat,
+      lon: p.lon,
+      bearing: p.bearing,
+      positionAt: new Date(p.at).toISOString(),
+      delayMinutes: t.delayMinutes,
+      canceled: t.canceled,
+      to: t.to,
+      lastStation: last ? { station: last.station, name: stationInfo(last.station).name, at: last.at } : null,
+      nextStation: next ? { station: next.station, name: stationInfo(next.station).name, scheduled: next.scheduled, estimated: next.estimated } : null,
+    });
+  }
+  return { updatedAt: posState.updatedAt || state.updatedAt, upstream: posState.upstream, count: trains.length, trains };
 }
 
 // Station names and coordinates change rarely: fetch once, retry at most every 10 min, refresh at most every 24 h.
@@ -205,6 +313,8 @@ function readBody(req, limit = 1024) {
 module.exports = {
   // Test hook: run one poll round now. Not part of the HTTP contract.
   _pollNow: tick,
+  // Test hook: run one position round now. Not part of the HTTP contract.
+  _pollPositionsNow: positionTick,
 
   init(ctx) {
     state.displaysFile = path.join(ctx.dataDir, 'displays.json');
@@ -213,6 +323,7 @@ module.exports = {
       for (const [id, v] of Object.entries(saved)) if (ID_RE.test(id) && validThresholds(v)) displays.set(id, { trains: v.trains, minutes: v.minutes });
     } catch {}
     schedule(0);
+    schedulePositions(POSITION_POLL_MS);
     state.ping = setInterval(() => {
       for (const s of streams) { try { s.res.write(': ping\n\n'); } catch { streams.delete(s); } }
     }, 25000);
@@ -239,6 +350,8 @@ module.exports = {
         announcements,
       });
     }
+
+    if (req.method === 'GET' && p === '/api/trains') return json(res, 200, trainsBody());
 
     if (req.method === 'GET' && p === '/api/stations') {
       const id = params.get('displayId') || 'default';

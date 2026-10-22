@@ -133,6 +133,45 @@ default thresholds, a bad id gets `400`).
   appears, with `lat` and `lon` `null` (and `name` = signature if the name is unknown too); map UIs can skip it.
 - With `upstream: "no-key"` (demo data) only `Sci` appears, with hardcoded coordinates for Stockholm City.
 
+### `GET /t/babtist/api/trains`
+
+Live positions of the SL commuter trains we track, joined with their delay, for a clickable train layer on a map.
+One shared upstream loop polls Trafikverket `TrainPosition` every 10 s; requests never call upstream. Not per display:
+colour by `delayMinutes` against the display's own `minutes` threshold on the client.
+
+```json
+{
+  "updatedAt": "2026-10-22T10:55:10.000Z",
+  "upstream": "ok",
+  "count": 1,
+  "trains": [
+    {
+      "trainId": "2219-2026-10-22",
+      "train": "2219",
+      "lat": 59.3324,
+      "lon": 18.0649,
+      "bearing": 169,
+      "positionAt": "2026-10-22T10:55:02.000Z",
+      "delayMinutes": 4,
+      "canceled": false,
+      "to": ["Söc"],
+      "lastStation": { "station": "Sci", "name": "Stockholm City", "at": "2026-10-22T10:53:00.000Z" },
+      "nextStation": { "station": "Sst", "name": "Stockholms södra", "scheduled": "2026-10-22T10:55:00.000Z", "estimated": null }
+    }
+  ]
+}
+```
+
+- Only trains that have both a recent position and announcements in our window appear. `lat` and `lon` are never
+  `null`. `bearing` (degrees, 0 = north, clockwise) can be `null`.
+- A train is dropped when its `positionAt` is older than 5 minutes. Clients may grey out older positions earlier.
+- `delayMinutes` uses the same rule as `/api/status` (latest actual, else largest estimate, never negative), and is
+  `null` when nothing is reported yet. `canceled` is `true` if any of its announcements in the window is canceled.
+- `lastStation`: the latest stop with an actual time (`null` if none). `nextStation`: the earliest stop without an
+  actual time, scheduled after `lastStation` (`null` if none in the window). `name` falls back to the signature.
+- `upstream` reflects the position feed: `ok`, `error` (positions may be stale) or `no-key` (empty list).
+- Sorted by `train`.
+
 ### `GET /t/babtist/api/health`
 
 ```json
@@ -142,8 +181,8 @@ default thresholds, a bad id gets `400`).
 ## Guarantees
 
 - Exactly one upstream poll loop, no matter how many displays or browsers connect.
-- Only the commuter-train rows needed for the current delays, and a station list (signature, name, coordinates),
-  are kept, in memory. Only display thresholds are
+- Only the commuter-train rows needed for the current delays, a station list (signature, name, coordinates) and the
+  latest position per tracked train are kept, in memory. Only display thresholds are
   written to disk.
 - Errors: `400` bad input, `404` unknown route/display, `429` too many streams/displays. Body `{ "error": "..." }`.
 
