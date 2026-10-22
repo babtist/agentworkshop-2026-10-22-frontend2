@@ -1,2 +1,6 @@
 .claude/spore/seen
 .claude/settings.local.json
+node_modules/
+.playwright-browsers/
+test-results/
+playwright-report/

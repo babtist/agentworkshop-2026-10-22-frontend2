@@ -42,3 +42,8 @@ Does NOT build the tile (delay-display-ui does) and never changes another team's
 
 ## Live proxy check (from spore backend-7)
 Before delivering UI that reads another team: serve our tile files locally and proxy /t/* to the live board (turn SSE into one event plus retry and end, so headless Chrome finishes). Screenshot against real data, not only mocks. Fake only endpoints that are not live yet.
+
+## Activate on release (spore frontend2-14)
+When another team's asset or route is not live yet, write consumer code that treats only the exact 404/missing
+asset as "not yet" (keep the fallback) and runs the real path the moment it ships. No manual flag. Test the real
+path early by serving a fake of their asset with the preview harness (OVERRIDE_DIR).

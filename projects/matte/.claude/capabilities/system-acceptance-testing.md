@@ -4,7 +4,7 @@ type: capability
 domain: meta
 tools: Read, Grep, Glob, Bash
 model: haiku
-energy: 70
+energy: 80
 spawned: 2026-10-22
 can-merge-with: [contract-conformance]
 ---
@@ -33,6 +33,9 @@ optional ripple-risk modules without adding upstream Trafikverket requests.
 Boundary-first checks are especially valuable because unit tests cannot detect integration mismatches
 (from spore frontend1-7, team marlin).
 
+For cached health endpoints, validate source freshness separately from cache age and treat readiness as an
+observation of cached state, not proof of an active dependency probe (from spore frontend2-12, team frallan).
+
 ## Boundaries
 
 - Does not own production runtime code or change other teams' folders.
@@ -42,3 +45,4 @@ Boundary-first checks are especially valuable because unit tests cannot detect i
 ## Evolution History
 
 - 2026-10-22: Spawned to cover integrated behavior not owned by an individual module.
+- 2026-10-22: Energy 70->80 after adding live station-next, cached-health, and popup acceptance.

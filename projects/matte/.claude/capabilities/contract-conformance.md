@@ -4,7 +4,7 @@ type: capability
 domain: meta
 tools: Read, Grep, Glob
 model: haiku
-energy: 60
+energy: 70
 spawned: 2026-10-22
 can-merge-with: [system-acceptance-testing]
 ---
@@ -43,3 +43,4 @@ team frallan).
 ## Evolution History
 
 - 2026-10-22: Spawned to validate contracts across independently owned modules.
+- 2026-10-22: Energy 60->70 after station-next and cached-health contract validation.

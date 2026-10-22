@@ -58,7 +58,15 @@ def skip_if_not_deployed(test_case, code, payload, plugin):
     if plugin == "frallan" and "no plugin for frallan" in str(payload):
         test_case.skipTest("frallan risk plugin is not deployed yet")
     if plugin == "babtist" and payload == '{"error":"not found"}':
-        test_case.skipTest("babtist train-position endpoint is not deployed yet")
+        test_case.skipTest("babtist API route is not deployed yet")
+    if plugin == "frallan" and payload == '{"error":"not found"}':
+        test_case.skipTest("frallan API route is not deployed yet")
+
+
+def assert_iso_timestamp(test_case, value):
+    test_case.assertIsInstance(value, str)
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    test_case.assertIsNotNone(parsed.tzinfo)
 
 
 class LiveAcceptanceTests(unittest.TestCase):
@@ -227,6 +235,124 @@ class LiveAcceptanceTests(unittest.TestCase):
                     self.assertIsNone(risk["level"])
                     self.assertIsNone(risk["affectedTrainCount"])
                     self.assertIsNone(risk["canceledTrainCount"])
+
+    def test_live_station_next_trains_contract_when_deployed(self):
+        station = "Sci"
+        path = (
+            f"{CONTROLLER}/stations/{urllib.parse.quote(station, safe='')}/next"
+            "?limit=3"
+        )
+        code, result = request(path)
+        skip_if_not_deployed(self, code, result, "babtist")
+
+        self.assertEqual(code, 200, result)
+        self.assertEqual(result["station"], station)
+        self.assertTrue(result["name"])
+        self.assertIn(result["upstream"], {"ok", "error", "no-key"})
+        if result["updatedAt"] is not None:
+            assert_iso_timestamp(self, result["updatedAt"])
+        elif result["upstream"] == "ok":
+            self.fail("station-next response is fresh but has no updatedAt")
+        self.assertIs(type(result["count"]), int)
+        self.assertEqual(result["count"], len(result["trains"]))
+        self.assertLessEqual(result["count"], 3)
+
+        expected_times = []
+        for train in result["trains"]:
+            self.assertTrue(train["trainId"])
+            self.assertTrue(train["train"])
+            self.assertIsInstance(train["to"], list)
+            for destination in train["to"]:
+                self.assertTrue(destination["station"])
+                self.assertTrue(destination["name"])
+            for stop_name in ("arrival", "departure"):
+                stop = train[stop_name]
+                if stop is not None:
+                    assert_iso_timestamp(self, stop["scheduled"])
+                    if stop["estimated"] is not None:
+                        assert_iso_timestamp(self, stop["estimated"])
+            assert_iso_timestamp(self, train["expected"])
+            expected_times.append(train["expected"])
+            self.assertIs(type(train["delayMinutes"]), int)
+            self.assertGreaterEqual(train["delayMinutes"], 0)
+            self.assertIsInstance(train["canceled"], bool)
+        self.assertEqual(expected_times, sorted(expected_times))
+
+    def test_live_frallan_cached_health_contract_when_deployed(self):
+        code, health = request(f"{BASE_URL}/t/frallan/api/health")
+        skip_if_not_deployed(self, code, health, "frallan")
+
+        self.assertIn(code, {200, 503}, health)
+        self.assertIsInstance(health["ok"], bool)
+        self.assertEqual(code == 200, health["ok"])
+        self.assertIn(
+            health["snapshotAvailability"],
+            {"idle", "ready", "insufficient", "stale", "unavailable", "demo"},
+        )
+        assert_iso_timestamp(self, health["checkedAt"])
+
+        source = health["source"]
+        self.assertIn(source["upstream"], {"ok", "error", "no-key", None})
+        self.assertTrue(source["updatedAt"] is None or isinstance(source["updatedAt"], str))
+        if source["updatedAt"] is not None:
+            assert_iso_timestamp(self, source["updatedAt"])
+        self.assertTrue(
+            source["ageSeconds"] is None
+            or (isinstance(source["ageSeconds"], (int, float)) and isfinite(source["ageSeconds"]))
+        )
+
+        cache = health["cache"]
+        self.assertTrue(
+            cache["ageSeconds"] is None
+            or (isinstance(cache["ageSeconds"], (int, float)) and isfinite(cache["ageSeconds"]))
+        )
+        self.assertGreaterEqual(cache["ttlSeconds"], 0)
+        self.assertIsInstance(cache["refreshInFlight"], bool)
+
+        last_fetch = health["lastSnapshotFetch"]
+        self.assertIn(last_fetch["outcome"], {"never", "ok", "error"})
+        self.assertTrue(
+            last_fetch["completedAt"] is None
+            or isinstance(last_fetch["completedAt"], str)
+        )
+        if last_fetch["completedAt"] is not None:
+            assert_iso_timestamp(self, last_fetch["completedAt"])
+        self.assertTrue(
+            last_fetch["errorCode"] is None or isinstance(last_fetch["errorCode"], str)
+        )
+        if last_fetch["outcome"] == "never":
+            self.assertIsNone(last_fetch["completedAt"])
+            self.assertEqual(health["snapshotAvailability"], "idle")
+
+        settings = health["displaySettings"]
+        for count_name in ("entries", "refreshesInFlight", "failedEntries"):
+            self.assertIs(type(settings[count_name]), int)
+            self.assertGreaterEqual(settings[count_name], 0)
+        self.assertLessEqual(settings["refreshesInFlight"], settings["entries"])
+        self.assertLessEqual(settings["failedEntries"], settings["entries"])
+        for private_field in ("trainId", "displayId", "announcements", "rawError"):
+            self.assertNotIn(private_field, health)
+
+    def test_station_popup_consumes_station_next_endpoint_when_deployed(self):
+        next_path = f"{CONTROLLER}/stations/Sci/next?limit=1"
+        code, response = request(next_path)
+        skip_if_not_deployed(self, code, response, "babtist")
+
+        map_code, map_js = request(f"{PRESENTATION}/map.js")
+        self.assertEqual(map_code, 200)
+        self.assertIn(
+            "stations/${encodeURIComponent(s.station)}/next?limit=10",
+            map_js,
+        )
+        self.assertIn("popupopen", map_js)
+        self.assertIn("popupclose", map_js)
+        self.assertIn("NEXT_MS = 20000", map_js)
+        self.assertIn("slice(0, 8)", map_js)
+        self.assertIn("'on time'", map_js)
+        self.assertIn("'canceled'", map_js)
+        self.assertIn("No trains in the next 30 minutes.", map_js)
+        self.assertIn("Next-train list is not switched on yet.", map_js)
+        self.assertIn("Could not load next trains right now.", map_js)
 
     def test_presentation_serves_single_display_and_wall_assets(self):
         display_id = f"matte-ui-{uuid.uuid4().hex[:8]}"

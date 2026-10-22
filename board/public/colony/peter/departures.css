@@ -1,0 +1,114 @@
+:root {
+  --led: #ffb000;
+  --led-dim: #7a5500;
+  --late: #ff7a1a;
+  --sev: #ff3b30;
+  --bg: #050505;
+  --panel: #0d0d0b;
+  --glow: 0 0 0.35em rgba(255, 176, 0, 0.55);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #000; }
+body {
+  color: var(--led);
+  font-family: "DejaVu Sans Mono", "Menlo", "Consolas", ui-monospace, monospace;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-shadow: var(--glow);
+  overflow: hidden;
+}
+
+.sign {
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 2.4vmin 3vmin;
+  gap: 1.2vmin;
+  background:
+    radial-gradient(circle, rgba(255, 176, 0, 0.05) 1px, transparent 1.4px) 0 0 / 4px 4px,
+    linear-gradient(180deg, #111 0%, var(--bg) 60%);
+  border: 1.2vmin solid #1b1b1b;
+  box-shadow: inset 0 0 6vmin #000;
+}
+
+.sign-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 2vmin;
+  border-bottom: 0.4vmin solid var(--led-dim);
+  padding-bottom: 1vmin;
+}
+.sign-station {
+  all: unset; cursor: pointer; min-width: 0;
+  font-size: clamp(22px, 6.4vmin, 120px);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sign-station:hover, .sign-station:focus-visible { text-decoration: underline dotted; }
+.sign-clock { flex-shrink: 0; font-size: clamp(18px, 4.6vmin, 90px); font-variant-numeric: tabular-nums; }
+
+.sign-cols, .row {
+  display: grid;
+  grid-template-columns: 24vmin 15vmin minmax(0, 1fr) 22vmin;
+  gap: 2vmin;
+  align-items: baseline;
+}
+/* Track column only when /next carries track info (babtist additive fields). */
+.c-track, .h-track { display: none; }
+body.has-track .c-track, body.has-track .h-track { display: block; text-align: center; }
+body.has-track .sign-cols, body.has-track .row { grid-template-columns: 27vmin 11vmin 16vmin minmax(0, 1fr) 22vmin; }
+.row.moved .c-track { color: #000; background: var(--led); text-shadow: none; border-radius: 0.12em; animation: blink 1.2s steps(2, start) 6; }
+.c-info {
+  grid-column: 1 / -1; font-size: 0.48em; color: var(--led); opacity: 0.9; white-space: normal !important;
+  padding-left: 0.2em; margin-top: -0.2em;
+}
+.c-info .moved-badge { color: #000; background: var(--led); text-shadow: none; padding: 0 0.35em; border-radius: 0.15em; }
+.sign-cols { font-size: clamp(11px, 2vmin, 30px); color: var(--led-dim); text-shadow: none; text-transform: uppercase; }
+.sign-cols span:last-child, .c-dep { text-align: right; }
+
+.sign-rows { list-style: none; margin: 0; padding: 0; overflow: hidden; }
+.row {
+  font-size: clamp(16px, 4.4vmin, 80px);
+  padding: 0.9vmin 0;
+  border-bottom: 1px solid rgba(255, 176, 0, 0.12);
+}
+.row.first { font-size: clamp(20px, 5.8vmin, 104px); padding: 1.4vmin 0; }
+.row span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.c-time em { font-style: normal; font-size: 0.55em; margin-left: 0.3em; vertical-align: super; }
+.c-time em.minor { color: var(--led); }
+.late { color: var(--late); text-shadow: 0 0 0.35em rgba(255, 122, 26, 0.6); }
+.sev, .can { color: var(--sev); text-shadow: 0 0 0.35em rgba(255, 59, 48, 0.7); }
+.c-dep.now { animation: blink 1s steps(2, start) infinite; }
+.row.canceled .c-time, .row.canceled .c-train, .row.canceled .c-to { text-decoration: line-through; opacity: 0.6; }
+.row.canceled .c-dep { animation: blink 1.4s steps(2, start) infinite; }
+.msg { font-size: clamp(16px, 4vmin, 70px); padding: 4vmin 0; opacity: 0.85; }
+@keyframes blink { to { visibility: hidden; } }
+
+.sign-foot { border-top: 0.4vmin solid var(--led-dim); padding-top: 1vmin; overflow: hidden; }
+.ticker { overflow: hidden; white-space: nowrap; font-size: clamp(12px, 2.8vmin, 50px); }
+.ticker span { display: inline-block; padding-left: 100%; animation: tick 28s linear infinite; }
+@keyframes tick { to { transform: translateX(-100%); } }
+body.stale .ticker { color: var(--late); }
+body.alert .sign { border-color: #3a0d0b; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker span { animation: none; padding-left: 0; white-space: normal; }
+  .c-dep.now, .row.canceled .c-dep { animation: none; }
+}
+@media (max-width: 640px) {
+  .sign-cols, .row { grid-template-columns: 19vw minmax(0, 1fr) 21vw; gap: 2.5vw; }
+  .row, .row.first { font-size: 4.6vw; letter-spacing: 0; }
+  .c-time em { display: none; }
+  .c-train, .sign-cols span:nth-child(3) { display: none; }
+  body.has-track .sign-cols, body.has-track .row { grid-template-columns: 17vw 10vw minmax(0, 1fr) 19vw; }
+}
+
+dialog {
+  background: #111; color: var(--led); border: 2px solid var(--led-dim); border-radius: 8px;
+  font: inherit; text-shadow: none; padding: 20px 24px; min-width: min(420px, 90vw);
+}
+dialog::backdrop { background: rgba(0, 0, 0, 0.7); }
+dialog label { display: block; margin-bottom: 8px; }
+dialog input { width: 100%; font: inherit; font-size: 18px; padding: 8px; background: #000; color: var(--led); border: 1px solid var(--led-dim); }
+.pick-row { display: flex; align-items: center; gap: 16px; margin-top: 14px; }
+.pick-row button { font: inherit; background: var(--led); color: #000; border: 0; padding: 8px 14px; cursor: pointer; }
+.pick-row a { color: var(--led); }
+.pick-miss { color: var(--late); margin: 8px 0 0; }

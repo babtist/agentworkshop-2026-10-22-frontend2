@@ -38,15 +38,16 @@
     title.href = `?displayId=${encodeURIComponent(id)}${kiosk ? '&kiosk=1' : ''}`;
     const level = el('div', 'level', '…');
     const summary = el('div', 'summary', 'Connecting to the controller…');
+    const scale = el('div', 'scale'); scale.hidden = true;
     const stats = el('div', 'stats');
     const stat = (label) => { const d = el('div'); const b = el('b', null, '–'); d.append(b, el('span', null, label)); stats.append(d); return b; };
     const late = stat('late'), canceled = stat('canceled'), maxDelay = stat('max delay (min)'), tracked = stat('trains tracked');
     const trendBox = el('div', 'trend');
     const notice = el('div', 'notice'); notice.hidden = true;
     const meta = el('div', 'meta');
-    root.append(title, level, summary, stats, trendBox, notice, meta);
+    root.append(title, level, summary, scale, stats, trendBox, notice, meta);
 
-    const card = { id, root, lastAt: 0, samples: [], minutes: null, thresholds: null, level: null, flashUntil: 0 };
+    const card = { id, root, trendBox, lastAt: 0, samples: [], minutes: null, thresholds: null, level: null, flashUntil: 0 };
 
     card.setNotice = (text) => { notice.hidden = !text; notice.textContent = text; };
 
@@ -64,7 +65,8 @@
       card.level = lvl;
       root.className = 'card lvl-' + lvl + (Date.now() < card.flashUntil ? ' escalated' : '');
       setLevel(lvl, LABEL[lvl] || '?');
-      summary.textContent = `${s.lateCount} train${s.lateCount === 1 ? '' : 's'} ≥ ${t.minutes} min late · warning at ${t.trains}, severe at ${t.trains * 2}`;
+      summary.textContent = `${s.lateCount} train${s.lateCount === 1 ? ' is' : 's are'} ${t.minutes} min or more late`;
+      drawScale(scale, s.lateCount, t);
       late.textContent = s.lateCount;
       canceled.textContent = s.canceledCount;
       maxDelay.textContent = s.maxDelayMinutes;
@@ -81,6 +83,7 @@
       root.className = 'card lvl-unknown';
       setLevel('unknown', 'No data');
       summary.textContent = msg;
+      scale.hidden = true;
     };
 
     card.poll = async () => {
@@ -94,6 +97,28 @@
     };
     return card;
   }
+
+  // ---------- scale: where the late count sits between green, orange and red ----------
+  const range = (a, b) => (b <= a ? `${a}` : `${a}–${b}`);
+  function bands(t) {
+    const y = t.trains;
+    return [
+      ['ok', y > 1 ? `${range(0, y - 1)} late` : '0 late'],
+      ['warning', `${range(y, 2 * y - 1)} late`],
+      ['severe', `${2 * y}+ late`],
+    ];
+  }
+  function drawScale(box, n, t) {
+    if (!t.trains) { box.hidden = true; return; }
+    box.hidden = false;
+    const y = t.trains, top = 3 * y;
+    const pos = Math.min(100, (Math.min(n, top) / top) * 100);
+    const segs = bands(t).map(([cls, txt]) => `<div class="seg seg-${cls}"><span>${txt}</span></div>`).join('');
+    box.innerHTML = `<div class="segs">${segs}<div class="marker" style="left:${pos}%"><b>${n}</b></div></div>`;
+    box.setAttribute('role', 'img');
+    box.setAttribute('aria-label', `${n} late trains. Green below ${y}, orange from ${y}, red from ${2 * y}.`);
+  }
+  window.peterBands = bands;
 
   // ---------- trend: late trains over the last hour, in memory only ----------
   function addSample(card, s, t) {
@@ -140,7 +165,7 @@
       svg.append(dot);
     }
     const span = Math.round((now - (pts[0]?.t ?? now)) / 60000);
-    const cap = el('div', 'trend-cap', `late trains, last ${span < 1 ? '<1' : span} min (page memory only)`);
+    const cap = el('div', 'trend-cap', `Late trains, last ${span < 1 ? '<1' : span} min. Dashed lines: orange at ${card.thresholds?.trains ?? '–'}, red at ${card.thresholds?.trains ? card.thresholds.trains * 2 : '–'}.`);
     box.replaceChildren(svg, cap);
   }
 
@@ -212,6 +237,7 @@
   // ---------- page ----------
   const grid = $('grid');
   cards = ids.map(makeCard);
+  window.peterCards = cards;
   grid.replaceChildren(...cards.map((c) => c.root));
 
   if (wall) {
@@ -249,10 +275,21 @@
   });
   $('kioskLink').href = (() => { const u = new URL(location.href); u.searchParams.set('kiosk', '1'); return u.toString(); })();
 
+  function preview() {
+    const y = Number($('trains').value), m = Number($('minutes').value);
+    if (!(y >= 1) || !(m >= 1)) { $('preview').textContent = ''; return; }
+    const lbl = { ok: 'Green', warning: 'Orange', severe: 'Red' };
+    $('preview').innerHTML = window.peterBands({ trains: y }).map(([cls, txt]) =>
+      `<span class="pv pv-${cls}"><b>${lbl[cls]}</b> ${txt.replace('late', `trains ${m}+ min late`)}</span>`).join('');
+  }
+  $('trains').addEventListener('input', preview);
+  $('minutes').addEventListener('input', preview);
+
   function syncForm(c) {
     if (document.activeElement === $('trains') || document.activeElement === $('minutes')) return;
     $('trains').value = c.thresholds?.trains ?? '';
     $('minutes').value = c.thresholds?.minutes ?? '';
+    preview();
   }
 
   if (wall) {

@@ -75,6 +75,11 @@ test('integrates with the real controller: isolated display settings and shared 
   assert.equal((await get('relaxed')).level, 'ok');
   const defaults = await Promise.all(Array.from({ length: 20 }, (_, i) => get(`smoke-${i}`)));
   assert.ok(defaults.every(result => result.level === 'warning' && result.thresholds.trains === 3));
+  const trends = await Promise.all(Array.from({ length: 20 }, () =>
+    fetch(`${base}/t/frallan/api/trend?displayId=strict`).then(response => response.json())));
+  assert.ok(trends.every(result => result.availability === 'warming-up' &&
+    result.points.length === 1 && result.points[0].lateCount === 1 && result.delta === null));
+  assert.equal((await get('strict')).level, 'severe');
   assert.equal(upstreamCalls, before);
   assert.ok(!JSON.stringify(strict).includes('local-fixture'));
 });

@@ -1,6 +1,7 @@
 'use strict';
 
 const { analyze, validThresholds } = require('./risk');
+const { Trend, WINDOW_MS } = require('./trend');
 
 const CACHE_MS = 20000;
 const MAX_DISPLAYS = 500;
@@ -63,7 +64,16 @@ function createPlugin({
   }
 
   function displayEntry(id) {
-    if (displays.has(id)) return displays.get(id);
+    const accessedAt = now();
+    for (const [key, entry] of displays) {
+      if (!entry.pending && accessedAt - entry.usedAt > WINDOW_MS) displays.delete(key);
+      else entry.trend?.prune(accessedAt);
+    }
+    if (displays.has(id)) {
+      const entry = displays.get(id);
+      entry.usedAt = accessedAt;
+      return entry;
+    }
     if (displays.size >= MAX_DISPLAYS) {
       const evict = [...displays].find(([, entry]) => !entry.pending);
       if (!evict) {
@@ -72,7 +82,7 @@ function createPlugin({
       }
       displays.delete(evict[0]);
     }
-    const entry = { at: -Infinity, value: null, pending: null, outcome: 'never', errorCode: null };
+    const entry = { at: -Infinity, value: null, pending: null, outcome: 'never', errorCode: null, usedAt: accessedAt, trend: null };
     displays.set(id, entry);
     return entry;
   }
@@ -117,12 +127,22 @@ function createPlugin({
         const body = health();
         return json(res, body.ok ? 200 : 503, body);
       }
-      if (req.method !== 'GET' || path !== '/api/risk') return false;
+      if (req.method !== 'GET' || !['/api/risk', '/api/trend'].includes(path)) return false;
       const id = ctx.url.searchParams.get('displayId') ?? 'default';
       if (!id.length || id.length > 40 || INVALID_ID_CHAR.test(id) || ctx.url.searchParams.getAll('displayId').length > 1) {
         return json(res, 400, { error: 'Invalid displayId' });
       }
       const entry = displayEntry(id);
+      if (path === '/api/trend') {
+        const settings = entry ? await cached(entry, `api/status?displayId=${encodeURIComponent(id)}`,
+          value => value?.displayId === id && validThresholds(value.thresholds)) : null;
+        if (entry && !entry.trend) entry.trend = new Trend();
+        const body = (entry?.trend ?? new Trend()).read(settings, {
+          displayId: id, now: now(), attemptAt: entry?.at ?? now(),
+        });
+        if (body.availability === 'unavailable' && settings) log('Trend status schema or source health is unavailable');
+        return json(res, ['stale', 'unavailable'].includes(body.availability) ? 503 : 200, body);
+      }
       const [source, settings] = await Promise.all([
         cached(snapshot, 'api/snapshot', value => value !== null && typeof value === 'object' && !Array.isArray(value)),
         entry ? cached(entry, `api/status?displayId=${encodeURIComponent(id)}`,

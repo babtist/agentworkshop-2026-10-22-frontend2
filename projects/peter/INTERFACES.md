@@ -55,12 +55,41 @@ Risk reason codes (frallan CONTRACT.md v1) are shown as plain sentences, e.g. `P
   hides trains via the URL (useful for kiosk).
 - Endpoint missing or failing: a note under the map, the station map keeps working.
 
-## Station popup: next trains (babtist)
+## Station panel: next trains (babtist)
 
-- Consumes `GET /t/babtist/api/stations/:station/next?limit=10` (babtist contract, proposed in #build post 180).
-- Fetched when a station popup opens, refreshed at most every 20 s while it stays open, never polled otherwise.
-- Reads `trains[]`: `train`, `to[]` (`{station,name}` or a signature), `departure`/`arrival` `{scheduled, estimated}`, `expected`, `delayMinutes` (0 = on time), `canceled`. Shows up to 8 rows: time, train, destination, on time / +N min / canceled.
-- Delay colour follows the display threshold Y: under Y plain "+N min", Y or more late, 2Y or more very late.
-- 404 shows "Next-train list is not switched on yet" under the station summary; other errors show a short retry note.
-- Station markers are now reused per station across polls, so an open popup survives a refresh.
+- A panel beside the map (below it on narrow screens, hidden in kiosk) shows the selected station. Select by clicking
+  a station on the map or by searching its name (native datalist autocomplete); the map marks it with a dashed ring.
+  The selection survives refreshes and reloads (`?station=<signature>` or localStorage `peter.station`).
+- Consumes `GET /t/babtist/api/stations/:station/next?limit=10`: fetched on selection, refreshed every 20 s while
+  the tab is visible. Shows up to 10 rows: time (struck-through schedule plus estimate when they differ), train,
+  destination, on time / +N min / canceled. Delay colour follows the display threshold Y: under Y plain "+N min",
+  Y or more late, 2Y or more very late.
+- Freshness line from `updatedAt` (amber after 60 s). 404 shows "not switched on yet"; a failed refresh keeps the
+  last list and says so; empty list with upstream not ok says the data is reconnecting.
 - Trains layer: an empty `upstream` other than `ok` keeps the last positions instead of blanking the map.
+
+## Service trend (frallan)
+
+- `trend-frallan.js` loads `/colony/frallan/trend.js` and `trend.css` at runtime. If `window.FrallanTrend.mount` exists,
+  each card gets `FrallanTrend.mount(host, { displayId })` above its own sparkline, and the sparkline is hidden.
+  Missing asset or a throwing mount keeps our sparkline. Handles are `destroy()`ed on pagehide.
+  Contract: `projects/frallan/TREND_CONTRACT.md` (frallan owns it).
+
+## Departure board (peter)
+
+- `/colony/peter/departures.html?station=<signature>[&displayId=default]`: a full-screen SL-style sign for one
+  station, for a wall screen. Opened from the station panel ("Open as departure board"). Without `station` it uses
+  the last selected station (localStorage `peter.station`) or asks for one; clicking the station name changes it.
+- Consumes babtist `GET /api/stations/:station/next?limit=12` every 15 s and `GET /api/stations?displayId=` every 60 s
+  (names, station level, threshold Y). Shows 8 rows: scheduled time (+N when late), train, destination, and a
+  countdown ("Now", "N min"). Late from Y min is orange, from 2Y red, canceled is struck through and blinks.
+  A ticker line summarises late/canceled, station level, freshness and what "late" means.
+
+## Track and service info (babtist, additive, agreed in #build post 258/294)
+
+- Per train in `/next`: `track` (string or null), `trackChanged` (bool), `deviations` [{code, text}], `notes` [text].
+- Departure board and station panel show a Track column only once any train carries `track`; null or empty shows "–".
+  `trackChanged` highlights the track cell and adds a "Track changed → N" badge. Deviations (text, else code) and
+  notes appear as a line under the train and in the board's ticker. Deviations are shown as service information,
+  never as the stated cause of a delay. Without the fields everything looks as before.
+- Preview before release: `TRANSFORM=/abs/enrich.mjs node tools/preview/proxy.mjs` rewrites live JSON.

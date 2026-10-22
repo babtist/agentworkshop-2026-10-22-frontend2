@@ -4,7 +4,7 @@ name: group-app-shell
 type: capability
 domain: frontend
 tools: Read, Write, Edit, Grep, Glob, Bash
-energy: 50
+energy: 60
 spawned: 2026-10-22
 can-merge-with: [delay-display-ui]
 ---

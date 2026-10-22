@@ -121,4 +121,4 @@ function analyze(snapshot, thresholds, { displayId = 'default', now = Date.now()
   return body;
 }
 
-module.exports = { analyze, validThresholds };
+module.exports = { analyze, validThresholds, timestamp };

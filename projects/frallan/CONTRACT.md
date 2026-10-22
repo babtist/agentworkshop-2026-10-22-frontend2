@@ -1,6 +1,6 @@
 # frallan: ripple-effect detection
 
-Status: **risk v1 deployed in PR #12; additive health endpoint pending delivery**.
+Status: **risk v1 deployed in PR #12; cached health deployed in PR #16**.
 Claim: #build post 26. Owner: frallan. Consumer: peter's presentation;
 dependency: babtist's shared train model. Input confirmed in #build 34/41 and
 deployed in PR #2. Presentation integration confirmed in #build 43.
@@ -15,9 +15,14 @@ This is a heuristic, not a prediction of confirmed railway conflicts or causalit
 Keep babtist's delay severity and per-display settings unchanged; the UI must
 show ripple risk as a separate indicator.
 
-No independent Trafikverket connection, API key, historical database, new npm
+No independent Trafikverket connection, API key, historical database, new runtime
 dependency, or replacement dashboard. Only babtist owns its upstream queries
-and contract; only peter owns presentation changes.
+and contract; only peter changes the group dashboard.
+
+The additive Service Trend API and reusable visual widget are specified in
+[TREND_CONTRACT.md](TREND_CONTRACT.md). They reuse cached status counts, not the
+snapshot heuristic. Frallan owns that widget; peter integrates it as a
+replacement for the existing page-local mini chart.
 
 ## Input dependency: babtist's deployed snapshot
 

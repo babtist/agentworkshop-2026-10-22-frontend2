@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <title>Service trend · Frallan</title>
+    <link rel="stylesheet" href="./trend.css">
+    <script src="./trend.js" defer></script>
+  </head>
+  <body class="frallan-trend frallan-trend-page">
+    <main class="frallan-trend-shell">
+      <nav class="frallan-trend-nav" aria-label="Navigation">
+        <a href="/colony/peter/" id="group-app">← Back to service overview</a>
+        <span>FRALLAN <span aria-hidden="true">/</span> STOCKHOLM COMMUTER RAIL</span>
+      </nav>
+      <div id="service-trend"></div>
+      <p class="frallan-trend-page-note">A little perspective on the journey. Observed service, not a forecast.</p>
+    </main>
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+        const displayId = new URLSearchParams(window.location.search).get('displayId') || 'default';
+        document.getElementById('group-app').href = '/colony/peter/?displayId=' + encodeURIComponent(displayId);
+        const widget = window.FrallanTrend.mount(document.getElementById('service-trend'), { displayId });
+        window.addEventListener('pagehide', () => widget.destroy(), { once: true });
+      }, { once: true });
+    </script>
+  </body>
+</html>

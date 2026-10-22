@@ -13,7 +13,7 @@ async function listen(server) {
 
 async function harness(t, { timeoutMs = 1000 } = {}) {
   const state = { now: NOW, snapshotCalls: 0, settingsCalls: 0, logs: [], failure: false, settingsFailure: false, hang: false,
-    malformed: false, thresholds: { trains: 1, minutes: 5 }, source: snapshot() };
+    malformed: false, thresholds: { trains: 1, minutes: 5 }, lateCount: 4, source: snapshot() };
   const controller = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
     const isSnapshot = url.pathname === '/t/babtist/api/snapshot';
@@ -22,7 +22,9 @@ async function harness(t, { timeoutMs = 1000 } = {}) {
     if (state.hang) return;
     res.writeHead(state.failure || (!isSnapshot && state.settingsFailure) ? 503 : 200, { 'content-type': 'application/json' });
     res.end(state.malformed ? '{invalid' : JSON.stringify(isSnapshot ? state.source :
-      { displayId: url.searchParams.get('displayId'), thresholds: state.thresholds }));
+      { displayId: url.searchParams.get('displayId'), thresholds: state.thresholds,
+        updatedAt: state.source.updatedAt, upstream: state.source.upstream,
+        lateCount: state.lateCount, canceledCount: 0, trainsTracked: 20 }));
   });
   const controllerBase = await listen(controller);
   const plugin = createPlugin({ controllerUrl: controllerBase + '/t/babtist/',
@@ -70,6 +72,71 @@ test('coalesces concurrent snapshot/settings reads and caches both successes and
   assert.equal(recovered.code, 200);
   assert.equal(recovered.body.availability, 'ready');
   assert.equal(state.snapshotCalls, 3);
+});
+
+test('trend shares status cache with risk, not browser-specific history or extra snapshot reads', async t => {
+  const { state, get } = await harness(t);
+  assert.equal((await get('/api/trend?displayId=bad%20id')).code, 400);
+  assert.equal(state.settingsCalls, 0);
+  const clients = await Promise.all(Array.from({ length: 20 }, () => get('/api/trend?displayId=hall')));
+  assert.ok(clients.every(result => result.code === 200 && result.body.availability === 'warming-up'));
+  assert.ok(clients.every(result => result.body.points.length === 1 && result.body.delta === null));
+  assert.equal(state.settingsCalls, 1);
+  assert.equal(state.snapshotCalls, 0);
+  await get('/api/risk?displayId=hall');
+  assert.equal(state.settingsCalls, 1);
+  assert.equal(state.snapshotCalls, 1);
+  let result;
+  for (let i = 1; i <= 10; i++) {
+    state.now = NOW + i * 30000;
+    state.source.updatedAt = new Date(state.now).toISOString();
+    state.lateCount = 4 + i;
+    result = await get('/api/trend?displayId=hall');
+  }
+  assert.equal(result.body.availability, 'ready');
+  assert.equal(result.body.direction, 'worsening');
+  assert.equal(result.body.delta, 10);
+  assert.equal(result.body.points.length, 11);
+  assert.equal(state.snapshotCalls, 1);
+  assert.equal((await get('/api/trend?displayId=other')).body.points.length, 1);
+  state.now += 30000;
+  state.source.updatedAt = new Date(state.now).toISOString();
+  state.thresholds = { trains: 2, minutes: 5 };
+  const changed = await get('/api/trend?displayId=hall');
+  assert.equal(changed.body.availability, 'warming-up');
+  assert.equal(changed.body.points.length, 1);
+});
+
+test('trend exposes cached failures, recovery and stale/demo source state without zero fallbacks', async t => {
+  const { state, get } = await harness(t);
+  await get('/api/trend');
+  state.now += 30000;
+  state.settingsFailure = true;
+  const failed = await get('/api/trend');
+  assert.equal(failed.code, 503);
+  assert.equal(failed.body.availability, 'unavailable');
+  assert.equal(failed.body.points.at(-1).lateCount, null);
+  await get('/api/trend');
+  assert.equal(state.settingsCalls, 2);
+  state.settingsFailure = false;
+  state.now += 30000;
+  state.source.updatedAt = new Date(state.now).toISOString();
+  const recovered = await get('/api/trend');
+  assert.equal(recovered.body.availability, 'warming-up');
+  assert.equal(recovered.body.observedMinutes, 0);
+  state.now += 100000;
+  const stale = await get('/api/trend');
+  assert.equal(stale.code, 503);
+  assert.equal(stale.body.availability, 'stale');
+  state.now += 30000;
+  state.source.upstream = 'no-key';
+  state.source.updatedAt = new Date(state.now).toISOString();
+  const demo = await get('/api/trend');
+  assert.equal(demo.code, 200);
+  assert.equal(demo.body.availability, 'demo');
+  assert.equal(demo.body.direction, 'unknown');
+  assert.equal(state.snapshotCalls, 0);
+  assert.ok(state.logs.length);
 });
 
 test('refreshes authoritative thresholds, and rejects invalid IDs before reading the source', async t => {

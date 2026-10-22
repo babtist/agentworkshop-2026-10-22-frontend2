@@ -71,6 +71,7 @@ TEST DESIGN
 - Normalize timestamp instants when testing duplicate source rows, and treat service-date train IDs as opaque across midnight (from spore frontend2-4, team babtist).
 - For shared polling, use a local node:http fake and assert that adding downstream clients does not increase upstream requests (from spore frontend2-2, team babtist). Keep this test separate from real-module integration.
 - In pre-deploy live acceptance, skip only a recognized missing-plugin/route 404, never arbitrary errors. Keep post-deploy schema/state assertions in that same test so it activates without a manual flag; 503 must still validate the non-ready contract (from spore frontend2-10, team matte).
+- Register fixture cleanup immediately after each resource starts, before dependent setup can fail. Browser tests must use a reproducible project-local browser directory rather than rely on an unrecorded shell environment (from spore frontend2-16, team frallan).
 
 ANTI-GAMING
 - Never write trivial tests (assert true)

@@ -23,21 +23,38 @@
   <div id="grid"></div>
 
   <section id="mapSection">
-    <div id="map" role="region" aria-label="Map of commuter stations coloured by delay level"></div>
-    <div id="mapNote" class="map-note">Loading stations…</div>
+    <div class="map-row">
+      <div class="map-col">
+        <div id="map" role="region" aria-label="Map of commuter stations coloured by delay level"></div>
+        <div id="mapNote" class="map-note">Loading stations…</div>
+      </div>
+      <aside id="stationPanel" class="station-panel" aria-label="Selected station">
+        <form id="stationForm" class="sp-search" autocomplete="off" role="search">
+          <label for="stationSearch" class="sr-only">Find a station</label>
+          <input id="stationSearch" list="stationList" placeholder="Find a station…" maxlength="60">
+          <datalist id="stationList"></datalist>
+          <button>Go</button>
+        </form>
+        <p id="stationMiss" class="sp-note sp-err" hidden>No station with that name on this map.</p>
+        <div id="stationBody" aria-live="polite"></div>
+        <div id="stationFresh" class="sp-fresh"></div>
+      </aside>
+    </div>
   </section>
 
   <details id="settings">
-    <summary>Thresholds for display <b id="settingsFor"></b></summary>
+    <summary>When does the light turn orange or red? <span class="for">Display <b id="settingsFor"></b></span></summary>
     <form id="thresholds">
-      <label>Warn when at least <input id="trains" type="number" min="1" max="100" required> trains</label>
-      <label>are at least <input id="minutes" type="number" min="1" max="240" required> minutes late</label>
-      <button>Save</button>
-      <span id="saveMsg"></span>
+      <div class="rule"><span class="step">1</span>
+        <label>A train counts as <b>late</b> when it is <input id="minutes" type="number" min="1" max="240" required> minutes or more behind schedule.</label></div>
+      <div class="rule"><span class="step">2</span>
+        <label>The light turns <b class="t-warn">orange</b> when <input id="trains" type="number" min="1" max="100" required> or more trains are late, and <b class="t-sev">red</b> at twice as many.</label></div>
+      <div id="preview" class="preview" aria-live="polite"></div>
+      <div class="save-row"><button>Save for this display</button> <span id="saveMsg"></span></div>
     </form>
-    <p class="hint">Severe at twice that many trains. Each display keeps its own thresholds.
-      One display: <code>?displayId=hall-1</code>. Wall overview: <code>?displays=hall-1,hall-2</code>.
-      Add <code>&amp;kiosk=1</code> for a screen without controls, <code>&amp;sound=1</code> to beep when a level rises.</p>
+    <p class="hint">Saved on the controller, so every screen showing this display changes too. Each display keeps its own settings.</p>
+    <p class="hint">Screen tips: one display <code>?displayId=hall-1</code>, wall overview <code>?displays=hall-1,hall-2</code>,
+      add <code>&amp;kiosk=1</code> for a screen without controls, <code>&amp;sound=1</code> to beep when a level rises.</p>
   </details>
 
   <footer class="credits">One app, four teams:
@@ -52,4 +69,6 @@
 <script src="vendor/leaflet.js"></script>
 <script src="map.js"></script>
 <script src="trains.js"></script>
+<script src="station-panel.js"></script>
+<script src="trend-frallan.js"></script>
 </body></html>

@@ -29,6 +29,13 @@ uniquely named disposable display to check threshold persistence and its SSE upd
    unknown delay, canceled state, and missing next/last station information do not break station markers.
 7. After the ripple-risk endpoint is deployed, verify ready, insufficient, stale, unavailable, and demo states;
    non-ready states must be visibly neutral and must not alter the main delay level.
+8. After Babtist's station-next endpoint and Peter's popup are deployed, click a station marker. Verify the popup
+   fetches its next-train list on open, shows up to eight trains with time, train, destination, and on-time/delay/
+   canceled state, refreshes no more often than every 20 seconds while open, and stops refreshing when closed.
+   Confirm an empty list and a 404 each show the documented neutral fallback without breaking the station summary.
+9. After Frallan's health route is deployed, check its cached readiness fields and confirm source age is distinct
+   from cache age. Health should report idle before risk has warmed the cache, and a health-only visit must not
+   initiate a controller or Trafikverket fetch.
 
 If the live API assertions fail, report the failing endpoint, expected value, observed response, and upstream
 freshness to the owning team in `#build`. Do not alter their files.

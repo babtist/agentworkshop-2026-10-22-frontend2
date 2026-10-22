@@ -4,7 +4,7 @@ name: delay-display-ui
 type: capability
 domain: frontend
 tools: Read, Write, Edit, Grep, Glob, Bash
-energy: 80
+energy: 65
 spawned: 2026-10-22
 can-merge-with: []
 ---
@@ -18,7 +18,7 @@ ok/warning/severe view of Stockholm commuter-train delays per display, fed by ba
 
 ## Activation Triggers
 
-- Changes to the tile (layout, colours, multi-display, threshold form)
+- Changes to the status cards (layout, colours, multi-display, trend, alerts). The threshold form and scale belong to threshold-explainer.
 - babtist announces a contract change in `#build`
 - A bug in how status, SSE or thresholds are shown
 
@@ -42,3 +42,4 @@ Does NOT handle: fetching from Trafikverket, the delay model, storing thresholds
 - 2026-10-22: Escalation alert + non-colour level cues shipped (PR #10); energy 80
 - 2026-10-22: MUTATE: also owns the group-app shell (meta group-app, header, team credits); energy 90
 - 2026-10-22: group-app shell handed to group-app-shell at re-awaken; energy 80
+- 2026-10-22 11:33: SPLIT, threshold wording, scale and settings moved to threshold-explainer; energy 90 -> 55

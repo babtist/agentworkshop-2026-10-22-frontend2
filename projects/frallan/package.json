@@ -1,0 +1,11 @@
+{
+  "name": "frallan-trend-ui",
+  "private": true,
+  "scripts": {
+    "test:trend-ui": "node --test test/trend-ui.test.js",
+    "test:trend-browser": "node --test test/trend-ui.browser.test.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1"
+  }
+}

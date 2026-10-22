@@ -4,7 +4,7 @@ name: station-delay-map
 type: capability
 domain: frontend
 tools: Read, Write, Edit, Grep, Glob, Bash
-energy: 65
+energy: 55
 spawned: 2026-10-22
 can-merge-with: [delay-display-ui]
 ---
