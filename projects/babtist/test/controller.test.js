@@ -23,7 +23,7 @@ const upstream = http.createServer((req, res) => {
     lastBody = b;
     res.setHeader('content-type', 'application/json');
     res.end(JSON.stringify({ RESPONSE: { RESULT: [{ TrainAnnouncement: [
-      ann('1', 20, 7), ann('2', 15, 9), ann('3', 10, 12), ann('4', 8, 0), ann('5', 5, 0, { Canceled: true, TimeAtLocation: undefined }),
+      ann('1', 20, 7, { ToLocation: [{ LocationName: 'Söc', Priority: 1, Order: 0 }] }), ann('2', 15, 9), ann('3', 10, 12), ann('4', 8, 0), ann('5', 5, 0, { Canceled: true, TimeAtLocation: undefined }),
     ], INFO: { LASTCHANGEID: '42' } }] } }));
   });
 });
@@ -94,6 +94,25 @@ test('many clients cause no extra upstream calls, and SSE delivers a status even
   ctl.abort();
   assert.match(text, /^event: status\ndata: \{.*"displayId":"strict"/);
   assert.strictEqual(upstreamCalls, before);
+});
+
+test('snapshot exposes retained announcements without extra upstream calls', async () => {
+  const before = upstreamCalls;
+  const { code, body } = await get('/api/snapshot');
+  assert.strictEqual(code, 200);
+  assert.strictEqual(body.complete, true);
+  assert.strictEqual(body.count, 5);
+  assert.deepStrictEqual(body.window, { pastMinutes: 60, futureMinutes: 30 });
+  const a = body.announcements[0];
+  assert.match(a.trainId, /^1-\d{4}-\d{2}-\d{2}$/);
+  assert.strictEqual(a.station, 'Sci');
+  assert.strictEqual(a.activity, 'Ankomst');
+  assert.deepStrictEqual(a.to, ['Söc']);
+  assert.strictEqual(a.canceled, false);
+  assert.ok(Date.parse(a.actual) - Date.parse(a.scheduled) === 7 * 60000);
+  assert.strictEqual(body.announcements.at(-1).canceled, true);
+  assert.strictEqual(upstreamCalls, before);
+  assert.ok(!JSON.stringify(body).includes('test-key'));
 });
 
 test('health', async () => {

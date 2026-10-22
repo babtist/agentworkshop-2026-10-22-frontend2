@@ -48,6 +48,7 @@ function buildQuery(key, changeId) {
     <INCLUDE>EstimatedTimeAtLocation</INCLUDE>
     <INCLUDE>TimeAtLocation</INCLUDE>
     <INCLUDE>Canceled</INCLUDE>
+    <INCLUDE>ToLocation</INCLUDE>
   </QUERY>
 </REQUEST>`;
 }
@@ -158,6 +159,19 @@ module.exports = {
 
     if (req.method === 'GET' && p === '/api/health') {
       return json(res, 200, { ok: true, upstream: state.upstream, trainsTracked: model.statusFor(DEFAULT_THRESHOLDS).trainsTracked, displays: displays.size, streams: streams.size, lastPollAt: state.lastPollAt });
+    }
+
+    if (req.method === 'GET' && p === '/api/snapshot') {
+      const announcements = model.snapshot();
+      return json(res, 200, {
+        generatedAt: new Date().toISOString(),
+        updatedAt: state.updatedAt,
+        upstream: state.upstream,
+        complete: state.upstream === 'ok',
+        window: { pastMinutes: 60, futureMinutes: 30 },
+        count: announcements.length,
+        announcements,
+      });
     }
 
     if (req.method === 'GET' && (p === '/api/status' || p === '/api/stream')) {

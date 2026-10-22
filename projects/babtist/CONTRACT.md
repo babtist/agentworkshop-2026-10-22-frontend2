@@ -63,6 +63,41 @@ event: status
 data: {"displayId":"hall-1","level":"ok", ...}
 ```
 
+### `GET /t/babtist/api/snapshot`
+
+Read-only copy of the announcements the model retains, for analysis modules (for example ripple effects). It never
+triggers an upstream call. Window: `SL Pendeltåg` rows with scheduled time from 60 min ago to 30 min ahead, at most
+5000, oldest scheduled time first. Refreshed every 20 s (full refresh every 5 min).
+
+```json
+{
+  "generatedAt": "2026-10-22T10:20:01.000Z",
+  "updatedAt": "2026-10-22T10:19:52.000Z",
+  "upstream": "ok",
+  "complete": true,
+  "window": { "pastMinutes": 60, "futureMinutes": 30 },
+  "count": 1,
+  "announcements": [
+    {
+      "trainId": "2043-2026-10-22",
+      "station": "Sci",
+      "activity": "Ankomst",
+      "scheduled": "2026-10-22T08:15:00.000Z",
+      "estimated": null,
+      "actual": "2026-10-22T08:21:00.000Z",
+      "canceled": false,
+      "to": ["Söc"]
+    }
+  ]
+}
+```
+
+- `trainId` = Trafikverket train ident + `-` + service date (Swedish local date), stable across polls.
+- `station`: station signature. `activity`: `Ankomst` or `Avgang`. `to`: destination signatures (direction), `[]` if unknown.
+- `estimated` / `actual` are `null` until Trafikverket reports them.
+- `complete` is `true` only when `upstream` is `ok`. With `no-key` the data is synthetic demo data (always station `Sci`, no destination).
+- Routes are not included: the controller does not store a train's full timetable, only the announcements above.
+
 ### `GET /t/babtist/api/health`
 
 ```json

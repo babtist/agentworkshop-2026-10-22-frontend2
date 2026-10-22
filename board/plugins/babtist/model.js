@@ -11,6 +11,11 @@ const toMs = v => {
   return Number.isFinite(t) ? t : null;
 };
 
+const iso = ms => (ms == null ? null : new Date(ms).toISOString());
+// Service date in Swedish local time, so a train keeps the same id across midnight UTC.
+const serviceDate = ms => new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'Europe/Stockholm' });
+const trainIdOf = r => `${r.train}-${serviceDate(r.adv)}`;
+
 function parseResponse(json) {
   const result = json && json.RESPONSE && json.RESPONSE.RESULT && json.RESPONSE.RESULT[0];
   if (!result) throw new Error('unexpected response shape');
@@ -44,6 +49,9 @@ class Model {
       if (adv == null) continue;
       this.rows.set(key, {
         train: a.AdvertisedTrainIdent,
+        loc: a.LocationSignature || null,
+        activity: a.ActivityType || null,
+        to: Array.isArray(a.ToLocation) ? a.ToLocation.map(l => l && l.LocationName).filter(Boolean) : [],
         adv,
         act: toMs(a.TimeAtLocation),
         est: toMs(a.EstimatedTimeAtLocation),
@@ -58,8 +66,7 @@ class Model {
     const trains = new Map();
     for (const [key, r] of this.rows) {
       if (r.adv < now - WINDOW_PAST_MS || r.adv > now + WINDOW_FUTURE_MS) { this.rows.delete(key); continue; }
-      const day = new Date(r.adv).toISOString().slice(0, 10);
-      const id = r.train + '|' + day;
+      const id = trainIdOf(r);
       let t = trains.get(id);
       if (!t) { t = { canceled: false, lastActAdv: -1, actDelay: null, estDelay: null }; trains.set(id, t); }
       if (r.canceled) t.canceled = true;
@@ -76,6 +83,23 @@ class Model {
     }
     this.delays = delays;
     this.canceled = canceled;
+  }
+
+  // Read-only copy of the retained announcements, oldest first.
+  snapshot(now = Date.now()) {
+    this.summarize(now);
+    return [...this.rows.values()]
+      .sort((a, b) => a.adv - b.adv)
+      .map(r => ({
+        trainId: trainIdOf(r),
+        station: r.loc,
+        activity: r.activity,
+        scheduled: iso(r.adv),
+        estimated: iso(r.est),
+        actual: iso(r.act),
+        canceled: r.canceled,
+        to: r.to,
+      }));
   }
 
   statusFor(thresholds) {
