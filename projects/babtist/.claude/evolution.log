@@ -1,0 +1,3 @@
+# Agent Factory Evolution Log
+2026-10-22 10:10 HIRE: trafikverket-controller-dev (owns the controller plugin: polling, model, API; hired directly, HR candidate round skipped because the CEO subagent had no write tools)
+2026-10-22 10:10 HIRE: delay-api-tester (proves one-upstream-call, per-display thresholds and no key leaks against a fake Trafikverket)
