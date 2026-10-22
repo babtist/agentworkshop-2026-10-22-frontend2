@@ -134,7 +134,8 @@ class Model {
       live.add(r.train);
       const id = this.trainIdOf(r);
       let t = trains.get(id);
-      if (!t) { t = { canceled: false, lastActAdv: -1, actDelay: null, estDelay: null }; trains.set(id, t); }
+      if (!t) { t = { canceled: false, lastActAdv: -1, actDelay: null, estDelay: null, lastWhen: -Infinity }; trains.set(id, t); }
+      t.lastWhen = Math.max(t.lastWhen, r.act != null ? r.act : r.est != null ? r.est : r.adv);
       if (r.canceled) t.canceled = true;
       if (r.act != null) { if (r.adv > t.lastActAdv) { t.lastActAdv = r.adv; t.actDelay = r.act - r.adv; } }
       else if (r.est != null) t.estDelay = Math.max(t.estDelay == null ? -Infinity : t.estDelay, r.est - r.adv);
@@ -143,6 +144,8 @@ class Model {
     const delays = [];
     let canceled = 0;
     for (const t of trains.values()) {
+      // Status reflects "now": a train whose stops in the window all lie more than 15 min back no longer counts.
+      if (t.lastWhen < now - STATION_RECENT_MS) continue;
       if (t.canceled) { canceled++; continue; }
       const ms = t.actDelay != null ? t.actDelay : t.estDelay;
       if (ms == null) continue;

@@ -12,6 +12,9 @@ Base URL (same origin as The Square): `/t/babtist/`. All answers are JSON (`appl
   `AdvertisedTimeAtLocation`, in whole minutes (never negative).
 - A train counts as **late** for a display when its delay >= that display's `minutes`.
 - A train is **canceled** when any of its announcements has `Canceled: true`.
+- Only **current** trains count in `/api/status` and the SSE stream (`lateCount`, `canceledCount`, `trainsTracked`,
+  `maxDelayMinutes`): trains with at least one stop now, in the next 30 min, or in the last 15 min (time = actual,
+  else estimated, else scheduled). Trains that passed longer ago stay in `/api/snapshot` but no longer drive the level.
 - Level for a display, with `trains` = X and `lateCount` = number of late trains:
   - `ok`: `lateCount < trains`
   - `warning`: `trains <= lateCount < 2 * trains`

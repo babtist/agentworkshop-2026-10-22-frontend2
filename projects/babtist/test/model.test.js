@@ -39,13 +39,13 @@ test('midnight rollover: trainId stays stable after the pre-midnight row leaves 
   const m = new Model();
   m.apply([
     row('2801', MIDNIGHT_NOW, -20, actual(MIDNIGHT_NOW, -20, 6)),
-    row('2801', MIDNIGHT_NOW, 10, { LocationSignature: 'Cst', ...actual(MIDNIGHT_NOW, 10, 3) }),
+    row('2801', MIDNIGHT_NOW, 25, { LocationSignature: 'Cst', ...actual(MIDNIGHT_NOW, 25, 3) }),
   ], { now: MIDNIGHT_NOW });
-  const later = MIDNIGHT_NOW + 45 * MIN; // 00:55, the 23:50 row is now 65 min old
+  const later = MIDNIGHT_NOW + 41 * MIN; // 00:51, the 23:50 row is now 61 min old; the 00:38 stop is recent
   const snap = m.snapshot(later);
   assert.strictEqual(snap.length, 1);
   assert.strictEqual(snap[0].trainId, '2801-2026-10-21');
-  m.apply([row('2801', MIDNIGHT_NOW, 10, { LocationSignature: 'Cst', ...actual(MIDNIGHT_NOW, 10, 3) })], { full: true, now: later });
+  m.apply([row('2801', MIDNIGHT_NOW, 25, { LocationSignature: 'Cst', ...actual(MIDNIGHT_NOW, 25, 3) })], { full: true, now: later });
   assert.strictEqual(m.snapshot(later)[0].trainId, '2801-2026-10-21');
   assert.strictEqual(status(m).trainsTracked, 1);
 });
@@ -126,7 +126,8 @@ test('rows outside the 60 min back / 30 min ahead window are dropped on summariz
     row('503', NOW, 31, estimate(NOW, 31, 20)),
   ], { now: NOW });
   assert.deepStrictEqual(m.snapshot(NOW).map(a => a.trainId.split('-')[0]), ['501', '502']);
-  assert.strictEqual(status(m).maxDelayMinutes, 6);
+  // 501 stays in the snapshot, but passed more than 15 min ago, so status no longer counts it.
+  assert.strictEqual(status(m).maxDelayMinutes, 0);
   m.summarize(NOW + 2 * MIN);
   assert.strictEqual(status(m).trainsTracked, 1);
 });
@@ -190,4 +191,18 @@ test('stationsFor: demo data gives one station, Sci', () => {
   const s = m.stationsFor({ trains: 3, minutes: 5 }, NOW);
   assert.deepStrictEqual(s.map(x => x.station), ['Sci']);
   assert.ok(s[0].canceledCount > 0);
+});
+
+test('status counts only trains with a stop in the last 15 min or ahead', () => {
+  const m = new Model();
+  m.apply([
+    row('600', NOW, -50, actual(NOW, -50, 9)),
+    row('601', NOW, -25, actual(NOW, -25, 7)),
+    row('602', NOW, -10, actual(NOW, -10, 6)),
+    row('603', NOW, 10, estimate(NOW, 10, 8)),
+  ], { now: NOW });
+  const s = status(m);
+  assert.strictEqual(s.trainsTracked, 2);
+  assert.strictEqual(s.lateCount, 2);
+  assert.strictEqual(s.maxDelayMinutes, 8);
 });
