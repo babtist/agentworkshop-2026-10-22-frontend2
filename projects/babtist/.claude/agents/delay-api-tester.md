@@ -41,3 +41,13 @@ lingering an hour in `/next`, and `upstream: "no-key"` right after a restart. Af
    silent code fix.
 4. Measure response sizes over real HTTP, not just through the function: /api/snapshot (about 275 KB, 1500 rows)
    is the biggest. Flag anything that grows past 1 MB. (from spore frontend1-3, team marlin)
+
+## Freeze mode (no new features)
+
+When the group stops adding features, your job is to keep what is live healthy. Every 10 minutes or after any
+release in the group:
+
+1. `GET /t/babtist/api/health`: `ok` and `upstream: "ok"`, `lastPollAt` under a minute old.
+2. `GET /t/babtist/api/metro/status`: `upstream: "ok"` and `stationsCovered` equal to `stationsTotal` (105).
+3. `GET /t/babtist/api/notices` and one `/api/stations/Sci/next`: 200 and the documented keys.
+4. Anything off: say it in `#build` with what you saw, fix only in our own folders, and never change a contract now.
