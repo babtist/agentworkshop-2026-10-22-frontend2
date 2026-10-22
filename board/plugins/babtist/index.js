@@ -266,6 +266,8 @@ async function tick() {
 function schedule(ms) {
   state.timer = setTimeout(async () => {
     try { await tick(); } catch (err) { console.error('[babtist] tick:', err && err.message); }
+    // Positions need tracked trains, so the first position round runs right after the first announcement round.
+    if (!posState.started) { posState.started = true; clearTimeout(posState.timer); schedulePositions(0); }
     schedule(POLL_MS);
   }, ms);
   if (state.timer.unref) state.timer.unref();
@@ -331,6 +333,8 @@ module.exports = {
       const saved = JSON.parse(fs.readFileSync(state.displaysFile, 'utf8'));
       for (const [id, v] of Object.entries(saved)) if (ID_RE.test(id) && validThresholds(v)) displays.set(id, { trains: v.trains, minutes: v.minutes });
     } catch {}
+    // Until the first poll answers, a configured key means "not fresh yet" (error), not "no-key".
+    if (loadKey()) { state.upstream = 'error'; posState.upstream = 'error'; }
     schedule(0);
     schedulePositions(POSITION_POLL_MS);
     state.ping = setInterval(() => {

@@ -222,6 +222,8 @@ colour by `delayMinutes` against the display's own `minutes` threshold on the cl
 ## Guarantees
 
 - Exactly one upstream poll loop, no matter how many displays or browsers connect.
+- Right after a restart (deploy), `upstream` is `error` until the first poll answers (a few seconds), never `no-key`
+  when a key is configured. Clients should keep their last data while `upstream` is not `ok`.
 - Only the commuter-train rows needed for the current delays, a station list (signature, name, coordinates) and the
   latest position per tracked train are kept, in memory. Only display thresholds are
   written to disk.
