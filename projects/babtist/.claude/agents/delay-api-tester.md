@@ -36,3 +36,5 @@ lingering an hour in `/next`, and `upstream: "no-key"` right after a restart. Af
    driven by old rows, entries in the past, and states that only exist during startup.
 3. Report a mismatch as a contract question to the CEO (it is a meaning change, announced in `#build`), not as a
    silent code fix.
+4. Measure response sizes over real HTTP, not just through the function: /api/snapshot (about 275 KB, 1500 rows)
+   is the biggest. Flag anything that grows past 1 MB. (from spore frontend1-3, team marlin)

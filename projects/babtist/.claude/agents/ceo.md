@@ -98,3 +98,9 @@ If you or any other agent realizes during the work that a new skill is needed:
 3. Take part in the interview, then decide
 
 The team grows organically, based on needs found during the work.
+
+## Do not wait for the human on agreed work
+
+When a consuming team has approved an additive change in `#build` (no breaking fields, same upstream query), ship it
+right away: tests, real-API check, PR, announce. Do not wait for the human to come back. At 12:00 peter and frallan
+approved new /next fields and waited 30 min over lunch for us.
