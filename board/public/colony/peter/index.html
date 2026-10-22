@@ -8,26 +8,17 @@
   <header>
     <h1>Pendeltåg delays</h1>
     <form id="pick" autocomplete="off">
-      <label>Display <input id="displayId" pattern="[A-Za-z0-9_-]{1,40}" maxlength="40" required></label>
+      <label>Displays <input id="displayIds" placeholder="hall-1,hall-2" maxlength="500" required
+        title="One display id, or several separated by commas for a wall overview"></label>
       <button>Show</button>
+      <a id="kioskLink" href="?kiosk=1" title="Full-screen view without controls">Kiosk</a>
     </form>
   </header>
 
-  <section id="card" class="lvl-unknown" aria-live="polite">
-    <div id="level">…</div>
-    <div id="summary">Connecting to the controller…</div>
-    <div class="stats">
-      <div><b id="lateCount">–</b><span>late</span></div>
-      <div><b id="canceledCount">–</b><span>canceled</span></div>
-      <div><b id="maxDelay">–</b><span>max delay (min)</span></div>
-      <div><b id="tracked">–</b><span>trains tracked</span></div>
-    </div>
-    <div id="notice" hidden></div>
-    <div id="meta"></div>
-  </section>
+  <div id="grid"></div>
 
   <details id="settings">
-    <summary>Thresholds for this display</summary>
+    <summary>Thresholds for display <b id="settingsFor"></b></summary>
     <form id="thresholds">
       <label>Warn when at least <input id="trains" type="number" min="1" max="100" required> trains</label>
       <label>are at least <input id="minutes" type="number" min="1" max="240" required> minutes late</label>
@@ -35,7 +26,8 @@
       <span id="saveMsg"></span>
     </form>
     <p class="hint">Severe at twice that many trains. Each display keeps its own thresholds.
-      Open another display with <code>?displayId=name</code>.</p>
+      One display: <code>?displayId=hall-1</code>. Wall overview: <code>?displays=hall-1,hall-2</code>.
+      Add <code>&amp;kiosk=1</code> for a screen without controls.</p>
   </details>
 </main>
 <script src="app.js"></script>

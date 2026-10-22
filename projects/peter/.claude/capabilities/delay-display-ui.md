@@ -4,7 +4,7 @@ name: delay-display-ui
 type: capability
 domain: frontend
 tools: Read, Write, Edit, Grep, Glob, Bash
-energy: 60
+energy: 70
 spawned: 2026-10-22
 can-merge-with: []
 ---
@@ -38,3 +38,4 @@ Does NOT handle: fetching from Trafikverket, the delay model, storing thresholds
 ## Evolution History
 
 - 2026-10-22: Spawned at awaken for the presentation module
+- 2026-10-22: Kiosk, wall overview and trend shipped (PR #5); energy 70
