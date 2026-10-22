@@ -133,6 +133,47 @@ default thresholds, a bad id gets `400`).
   appears, with `lat` and `lon` `null` (and `name` = signature if the name is unknown too); map UIs can skip it.
 - With `upstream: "no-key"` (demo data) only `Sci` appears, with hardcoded coordinates for Stockholm City.
 
+### `GET /t/babtist/api/stations/:station/next?limit=<n>`
+
+The next commuter trains at one station, for a station popup ("when do the next trains come, and are they late?").
+Fetch it when the user opens a station (and refresh at most every 20 s while it is open). It never triggers an upstream
+call. `:station` is the station signature from `/api/stations` (URL-encoded, e.g. `S%C3%B6c` for `Söc`); `limit` is
+1 to 30, default 10.
+
+```json
+{
+  "station": "Sci",
+  "name": "Stockholm City",
+  "updatedAt": "2026-10-22T11:12:10.000Z",
+  "upstream": "ok",
+  "count": 1,
+  "trains": [
+    {
+      "trainId": "2231-2026-10-22",
+      "train": "2231",
+      "to": [{ "station": "Söc", "name": "Södertälje centrum" }],
+      "arrival": { "scheduled": "2026-10-22T11:15:00.000Z", "estimated": "2026-10-22T11:19:00.000Z" },
+      "departure": { "scheduled": "2026-10-22T11:16:00.000Z", "estimated": "2026-10-22T11:20:00.000Z" },
+      "expected": "2026-10-22T11:20:00.000Z",
+      "delayMinutes": 4,
+      "canceled": false
+    }
+  ]
+}
+```
+
+- One entry per train run that has not yet left the station: its departure (or, at a terminus, its arrival) has no
+  actual time yet. Only what is in the model window (up to 30 min ahead), so the list can be shorter than `limit`.
+  Entries whose `expected` is more than 5 minutes in the past are dropped (canceled stops never get an actual time).
+- `arrival` / `departure` are `null` when the train has no such stop here (`departure: null` = the train terminates).
+  `estimated` is `null` when Trafikverket has no estimate, which normally means the train runs to schedule.
+- `expected` = departure estimated, else departure scheduled, else arrival estimated/scheduled. Sorted by `expected`.
+- `delayMinutes` = the estimate at this station minus the schedule (departure first), else the train's current delay
+  as in `/api/trains`, else `0`. Whole minutes, never negative. Colour it against the display's `minutes` threshold.
+- `canceled` is `true` if the train's stop at this station is canceled. Canceled trains stay in the list.
+- An unknown or quiet station gives `200` with an empty list (`name` falls back to the signature). A malformed
+  signature gives `400`.
+
 ### `GET /t/babtist/api/trains`
 
 Live positions of the SL commuter trains we track, joined with their delay, for a clickable train layer on a map.

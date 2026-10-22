@@ -14,6 +14,7 @@ const POLL_MS = Math.max(5000, Number(process.env.BABTIST_POLL_MS) || 20000);
 const POSITION_POLL_MS = Math.max(5000, Number(process.env.BABTIST_POSITION_POLL_MS) || 10000);
 const POSITION_MAX_AGE_MS = 5 * 60 * 1000;
 const TRAIN_RE = /^[A-Za-z0-9]{1,10}$/;
+const STATION_RE = /^[A-Za-z0-9åäöÅÄÖ ]{1,10}$/;
 const STATIONS_RETRY_MS = 10 * 60 * 1000;
 const STATIONS_REFRESH_MS = 24 * 60 * 60 * 1000;
 // Demo mode has no key, so no station list: keep one known marker so map UIs have something to draw.
@@ -218,6 +219,14 @@ function stationsBody(id) {
   };
 }
 
+function nextBody(sig, limit, now = Date.now()) {
+  const trains = model.nextAt(sig, now, limit).map(t => ({
+    ...t,
+    to: t.to.map(s => ({ station: s, name: stationInfo(s).name })),
+  }));
+  return { station: sig, name: stationInfo(sig).name, updatedAt: state.updatedAt, upstream: state.upstream, count: trains.length, trains };
+}
+
 async function poll() {
   const key = loadKey();
   if (!key) {
@@ -357,6 +366,17 @@ module.exports = {
       const id = params.get('displayId') || 'default';
       if (!ID_RE.test(id)) return json(res, 400, { error: 'displayId must match [A-Za-z0-9_-]{1,40}' });
       return json(res, 200, stationsBody(id));
+    }
+
+    const sm = /^\/api\/stations\/([^/]+)\/next$/.exec(p);
+    if (req.method === 'GET' && sm) {
+      let sig;
+      try { sig = decodeURIComponent(sm[1]); } catch { sig = null; }
+      if (!sig || !STATION_RE.test(sig)) return json(res, 400, { error: 'station must be a station signature (letters, digits, space; at most 10)' });
+      const raw = params.get('limit');
+      const limit = raw == null || raw === '' ? 10 : /^\d{1,2}$/.test(raw) ? Number(raw) : NaN;
+      if (!Number.isInteger(limit) || limit < 1 || limit > 30) return json(res, 400, { error: 'limit must be an integer 1..30' });
+      return json(res, 200, nextBody(sig, limit));
     }
 
     if (req.method === 'GET' && (p === '/api/status' || p === '/api/stream')) {
