@@ -138,3 +138,17 @@ body.kiosk .credits { display: none; }
 .map-legend .lg-trains { flex-basis: 100%; display: flex; gap: 10px; color: #c7d0e0; }
 .map-legend .lg-trains[hidden] { display: none; }
 .small-trains .train-marker .tm-rot > svg { transform: scale(.65); } .small-trains .tm-halo { width: 26px; height: 26px; margin: -13px 0 0 -13px; }
+
+/* Station popup: next trains */
+.next-popup .leaflet-popup-content { margin: 10px 12px; font-size: 13px; line-height: 1.35; }
+.next-popup .np-sum { color: #5b6478; font-size: 12px; }
+.next-popup .np-note { margin-top: 6px; color: #5b6478; }
+.next-trains { border-collapse: collapse; margin-top: 6px; width: 100%; }
+.next-trains th { text-align: left; font-weight: 600; font-size: 11px; color: #5b6478; padding: 2px 6px 2px 0; }
+.next-trains td { padding: 2px 6px 2px 0; border-top: 1px solid #e4e7ee; white-space: nowrap; }
+.next-trains td:nth-child(3) { white-space: normal; }
+.next-trains .np-ok { color: #138a5b; }
+.next-trains .np-late { color: #b56a00; font-weight: 600; }
+.next-trains .np-sev { color: #c62828; font-weight: 700; }
+.next-trains .np-can { color: #c62828; text-decoration: line-through; }
+.next-trains .np-minor { color: #3d4658; }

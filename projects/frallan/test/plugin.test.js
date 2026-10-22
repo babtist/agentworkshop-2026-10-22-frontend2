@@ -12,7 +12,7 @@ async function listen(server) {
 }
 
 async function harness(t, { timeoutMs = 1000 } = {}) {
-  const state = { now: NOW, snapshotCalls: 0, settingsCalls: 0, logs: [], failure: false, hang: false,
+  const state = { now: NOW, snapshotCalls: 0, settingsCalls: 0, logs: [], failure: false, settingsFailure: false, hang: false,
     malformed: false, thresholds: { trains: 1, minutes: 5 }, source: snapshot() };
   const controller = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
@@ -20,7 +20,7 @@ async function harness(t, { timeoutMs = 1000 } = {}) {
     if (isSnapshot) state.snapshotCalls++;
     else state.settingsCalls++;
     if (state.hang) return;
-    res.writeHead(state.failure ? 503 : 200, { 'content-type': 'application/json' });
+    res.writeHead(state.failure || (!isSnapshot && state.settingsFailure) ? 503 : 200, { 'content-type': 'application/json' });
     res.end(state.malformed ? '{invalid' : JSON.stringify(isSnapshot ? state.source :
       { displayId: url.searchParams.get('displayId'), thresholds: state.thresholds }));
   });
@@ -121,4 +121,115 @@ test('a hung dependency times out and never serves cached ready risk', async t =
   assert.equal(result.body.level, null);
   assert.equal(result.body.availability, 'unavailable');
   assert.ok(state.logs.length);
+});
+
+test('health reports idle without fetching and derives readiness/ages from cached state', async t => {
+  const { state, get } = await harness(t);
+  const idle = await get('/api/health');
+  assert.equal(idle.code, 503);
+  assert.equal(idle.body.ok, false);
+  assert.equal(idle.body.snapshotAvailability, 'idle');
+  assert.deepEqual(idle.body.source, { upstream: null, updatedAt: null, ageSeconds: null });
+  assert.equal(idle.body.cache.ageSeconds, null);
+  assert.deepEqual(idle.body.lastSnapshotFetch, { outcome: 'never', completedAt: null, errorCode: null });
+  assert.equal(state.snapshotCalls, 0);
+  assert.equal(state.settingsCalls, 0);
+
+  state.source.updatedAt = new Date(NOW - 5000).toISOString();
+  await get('/api/risk?displayId=private-display');
+  state.now += 2500;
+  const ready = await get('/api/health');
+  assert.equal(ready.code, 200);
+  assert.equal(ready.headers.get('cache-control'), 'no-store');
+  assert.equal(ready.body.snapshotAvailability, 'ready');
+  assert.equal(ready.body.source.ageSeconds, 7.5);
+  assert.equal(ready.body.cache.ageSeconds, 2.5);
+  assert.equal(ready.body.lastSnapshotFetch.outcome, 'ok');
+  assert.equal(ready.body.displaySettings.entries, 1);
+  assert.equal(state.snapshotCalls, 1);
+  assert.equal(state.settingsCalls, 1);
+  assert.ok(!JSON.stringify(ready.body).includes('private-display'));
+  assert.ok(!JSON.stringify(ready.body).includes('"trainId"'));
+
+  state.now = NOW + 90001;
+  const stale = await get('/api/health');
+  assert.equal(stale.code, 503);
+  assert.equal(stale.body.snapshotAvailability, 'stale');
+  assert.equal(stale.body.lastSnapshotFetch.outcome, 'ok');
+  assert.equal(state.snapshotCalls, 1);
+  assert.equal(state.settingsCalls, 1);
+});
+
+test('health distinguishes failed fetches from source quality and clears failures after recovery', async t => {
+  const { state, get } = await harness(t);
+  await get();
+  state.now += 20001;
+  state.failure = true;
+  await get();
+  const failed = await get('/api/health');
+  assert.equal(failed.code, 503);
+  assert.equal(failed.body.snapshotAvailability, 'unavailable');
+  assert.equal(failed.body.lastSnapshotFetch.outcome, 'error');
+  assert.equal(failed.body.lastSnapshotFetch.errorCode, 'CONTROLLER_FETCH_FAILED');
+  assert.equal(failed.body.lastSnapshotFetch.completedAt, new Date(state.now).toISOString());
+  assert.equal(failed.body.displaySettings.failedEntries, 1);
+  assert.equal(state.snapshotCalls, 2);
+  assert.equal(state.settingsCalls, 2);
+
+  state.now += 20001;
+  state.failure = false;
+  state.source.updatedAt = new Date(state.now).toISOString();
+  await get();
+  const recovered = await get('/api/health');
+  assert.equal(recovered.code, 200);
+  assert.equal(recovered.body.lastSnapshotFetch.errorCode, null);
+  assert.equal(recovered.body.displaySettings.failedEntries, 0);
+
+  for (const [extra, availability] of [
+    [{ upstream: 'no-key', complete: false }, 'demo'],
+    [{ complete: false }, 'insufficient'],
+    [{ upstream: 'error' }, 'unavailable'],
+  ]) {
+    state.now += 20001;
+    state.source = snapshot(undefined, { ...extra, updatedAt: new Date(state.now).toISOString() });
+    await get();
+    const health = await get('/api/health');
+    assert.equal(health.code, 503);
+    assert.equal(health.body.snapshotAvailability, availability);
+    assert.equal(health.body.lastSnapshotFetch.outcome, 'ok');
+  }
+});
+
+test('health exposes an in-flight refresh without joining it or creating more requests', async t => {
+  const { state, get } = await harness(t, { timeoutMs: 500 });
+  state.hang = true;
+  const risk = get();
+  for (let i = 0; i < 100 && (state.snapshotCalls === 0 || state.settingsCalls === 0); i++) {
+    await new Promise(resolve => setTimeout(resolve, 1));
+  }
+  assert.equal(state.snapshotCalls, 1);
+  assert.equal(state.settingsCalls, 1);
+  const pending = await get('/api/health');
+  assert.equal(pending.body.cache.refreshInFlight, true);
+  assert.equal(pending.body.displaySettings.refreshesInFlight, 1);
+  assert.equal(pending.body.snapshotAvailability, 'idle');
+  assert.equal(state.snapshotCalls, 1);
+  assert.equal(state.settingsCalls, 1);
+  assert.equal((await risk).code, 503);
+});
+
+test('a settings-only failure is visible even with a healthy snapshot', async t => {
+  const { state, get } = await harness(t);
+  state.settingsFailure = true;
+  await get();
+  const failed = await get('/api/health');
+  assert.equal(failed.code, 503);
+  assert.equal(failed.body.snapshotAvailability, 'ready');
+  assert.equal(failed.body.displaySettings.failedEntries, 1);
+  assert.equal(failed.body.lastSnapshotFetch.outcome, 'ok');
+  state.now += 20001;
+  state.settingsFailure = false;
+  state.source.updatedAt = new Date(state.now).toISOString();
+  await get();
+  assert.equal((await get('/api/health')).code, 200);
 });

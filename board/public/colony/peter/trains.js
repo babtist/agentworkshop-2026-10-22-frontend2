@@ -89,6 +89,11 @@
   const markers = new Map();
   function draw(data) {
     const minutes = pm.thresholds?.minutes || 5;
+    // A backend restart briefly answers "no-key" with no trains: keep the last positions instead of blanking the map.
+    if (data.upstream !== 'ok' && !(data.trains || []).length && markers.size) {
+      trainNote.textContent = `${markers.size} trains from the last update, the train feed is reconnecting`;
+      return;
+    }
     const now = Date.now();
     const seen = new Set();
     const counts = { late: 0, canceled: 0 };

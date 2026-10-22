@@ -54,3 +54,13 @@ Risk reason codes (frallan CONTRACT.md v1) are shown as plain sentences, e.g. `P
   position age. Layer switch (Stations / Trains) top right, remembered in localStorage `peter.trains`; `&trains=0`
   hides trains via the URL (useful for kiosk).
 - Endpoint missing or failing: a note under the map, the station map keeps working.
+
+## Station popup: next trains (babtist)
+
+- Consumes `GET /t/babtist/api/stations/:station/next?limit=10` (babtist contract, proposed in #build post 180).
+- Fetched when a station popup opens, refreshed at most every 20 s while it stays open, never polled otherwise.
+- Reads `trains[]`: `train`, `to[]` (`{station,name}` or a signature), `departure`/`arrival` `{scheduled, estimated}`, `expected`, `delayMinutes` (0 = on time), `canceled`. Shows up to 8 rows: time, train, destination, on time / +N min / canceled.
+- Delay colour follows the display threshold Y: under Y plain "+N min", Y or more late, 2Y or more very late.
+- 404 shows "Next-train list is not switched on yet" under the station summary; other errors show a short retry note.
+- Station markers are now reused per station across polls, so an open popup survives a refresh.
+- Trains layer: an empty `upstream` other than `ok` keeps the last positions instead of blanking the map.

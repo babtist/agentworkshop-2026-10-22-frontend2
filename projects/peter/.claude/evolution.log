@@ -11,3 +11,4 @@
 2026-10-22 11:06 MUTATE: delay-display-ui scope widened to group-app integration (peter chosen as FrontEnd 2 integrator)
 2026-10-22 11:08 SPAWN: group-app-shell (re-awaken: peter integrates the FrontEnd 2 group app; takes that load off delay-display-ui, which drops 90->80)
 2026-10-22 11:14 EVOLVE: live-train-layer 55->65 (train-shaped markers with glide and labels)
+2026-10-22 11:20 EVOLVE: station-delay-map 55->65 (station popup with next trains), module-integration-check 60->70 (verified live trains and risk, caught no-key blip)

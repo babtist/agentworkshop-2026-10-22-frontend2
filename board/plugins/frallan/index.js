@@ -21,7 +21,7 @@ function createPlugin({
   if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password || base.search || base.hash) {
     throw new Error('FRALLAN_CONTROLLER_URL must be an HTTP(S) base URL without credentials, query or fragment');
   }
-  const snapshot = { at: -Infinity, value: null, pending: null };
+  const snapshot = { at: -Infinity, value: null, pending: null, outcome: 'never', errorCode: null };
   const displays = new Map();
 
   async function readJson(route) {
@@ -46,8 +46,12 @@ function createPlugin({
         const value = await readJson(route);
         if (!validate(value)) throw new Error(`Invalid controller ${route.split('?')[0]} response`);
         entry.value = value;
+        entry.outcome = 'ok';
+        entry.errorCode = null;
       } catch (error) {
         entry.value = null;
+        entry.outcome = 'error';
+        entry.errorCode = 'CONTROLLER_FETCH_FAILED';
         log(error.message);
       } finally {
         entry.at = now();
@@ -68,14 +72,51 @@ function createPlugin({
       }
       displays.delete(evict[0]);
     }
-    const entry = { at: -Infinity, value: null, pending: null };
+    const entry = { at: -Infinity, value: null, pending: null, outcome: 'never', errorCode: null };
     displays.set(id, entry);
     return entry;
+  }
+
+  function health() {
+    const checkedAt = now();
+    const source = analyze(snapshot.value, { trains: 1, minutes: 1 }, { now: checkedAt });
+    const snapshotAvailability = snapshot.outcome === 'never' ? 'idle' : source.availability;
+    const settings = [...displays.values()];
+    const failedEntries = settings.filter(entry => entry.outcome === 'error' && checkedAt - entry.at < CACHE_MS).length;
+    return {
+      ok: snapshotAvailability === 'ready' && failedEntries === 0,
+      checkedAt: source.evaluatedAt,
+      snapshotAvailability,
+      source: {
+        upstream: source.upstream,
+        updatedAt: source.sourceUpdatedAt,
+        ageSeconds: source.sourceUpdatedAt === null ? null : (checkedAt - Date.parse(source.sourceUpdatedAt)) / 1000,
+      },
+      cache: {
+        ageSeconds: Number.isFinite(snapshot.at) ? (checkedAt - snapshot.at) / 1000 : null,
+        ttlSeconds: CACHE_MS / 1000,
+        refreshInFlight: snapshot.pending !== null,
+      },
+      lastSnapshotFetch: {
+        outcome: snapshot.outcome,
+        completedAt: Number.isFinite(snapshot.at) ? new Date(snapshot.at).toISOString() : null,
+        errorCode: snapshot.errorCode,
+      },
+      displaySettings: {
+        entries: settings.length,
+        refreshesInFlight: settings.filter(entry => entry.pending !== null).length,
+        failedEntries,
+      },
+    };
   }
 
   return {
     async handle(req, res, ctx) {
       const path = ctx.path.replace(/\/+$/, '') || '/';
+      if (req.method === 'GET' && path === '/api/health') {
+        const body = health();
+        return json(res, body.ok ? 200 : 503, body);
+      }
       if (req.method !== 'GET' || path !== '/api/risk') return false;
       const id = ctx.url.searchParams.get('displayId') ?? 'default';
       if (!id.length || id.length > 40 || INVALID_ID_CHAR.test(id) || ctx.url.searchParams.getAll('displayId').length > 1) {

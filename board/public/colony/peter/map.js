@@ -36,8 +36,56 @@
 
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+  // Station markers are reused across polls so an open "next trains" popup survives a refresh.
+  const stationMarkers = new Map();
+  const NEXT_MS = 20000;
+  const hhmm = (iso) => { const d = iso && new Date(iso); return d && !isNaN(d) ? d.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : '–'; };
+  function nextHtml(s, data, err) {
+    const head = `<b>${esc(s.name || s.station)}</b><br><span class="np-sum">${LEVEL_TEXT[s.level] || 'unknown'} · ${s.lateCount} late · ${s.canceledCount} canceled</span>`;
+    if (err) return `${head}<div class="np-note">${esc(err)}</div>`;
+    if (!data) return `${head}<div class="np-note">Loading next trains…</div>`;
+    const list = (data.trains || data.departures || []).slice(0, 8);
+    if (!list.length) return `${head}<div class="np-note">${data.upstream && data.upstream !== 'ok' ? 'Train data is reconnecting, try again shortly.' : 'No trains in the next 30 minutes.'}</div>`;
+    const rows = list.map((t) => {
+      const when = t.departure || t.arrival || {};
+      const to = (t.to || []).map((x) => (typeof x === 'string' ? window.peterMap.names.get(x) || x : x.name || x.station)).join(', ');
+      const d = t.delayMinutes || 0;
+      const y = window.peterMap.thresholds?.minutes || 5;
+      const [cls, txt] = t.canceled ? ['np-can', 'canceled'] : d >= 2 * y ? ['np-sev', `+${d} min`]
+        : d >= y ? ['np-late', `+${d} min`] : d > 0 ? ['np-minor', `+${d} min`] : ['np-ok', 'on time'];
+      return `<tr><td>${hhmm(when.scheduled || t.expected)}</td><td>${esc(t.train || '')}</td><td>${esc(to)}</td><td class="${cls}">${txt}</td></tr>`;
+    }).join('');
+    return `${head}<table class="next-trains"><thead><tr><th>Time</th><th>Train</th><th>To</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+  async function loadNext(m) {
+    const s = m.station;
+    if (m.nextAt && Date.now() - m.nextAt < NEXT_MS) return;
+    m.nextAt = Date.now();
+    try {
+      const r = await fetch(`${API}/stations/${encodeURIComponent(s.station)}/next?limit=10`, { cache: 'no-store' });
+      if (r.status === 404) { m.nextErr = 'Next-train list is not switched on yet.'; m.next = null; }
+      else if (!r.ok) throw new Error(r.status);
+      else { m.next = await r.json(); m.nextErr = null; }
+    } catch { m.nextErr = 'Could not load next trains right now.'; }
+    if (m.isPopupOpen()) m.setPopupContent(nextHtml(m.station, m.next, m.nextErr));
+  }
+  function stationMarker(s) {
+    let m = stationMarkers.get(s.station);
+    if (!m) {
+      m = L.circleMarker([s.lat, s.lon]).bindTooltip('').bindPopup('', { maxWidth: 320, className: 'next-popup' }).addTo(layer);
+      m.on('popupopen', () => {
+        m.setPopupContent(nextHtml(m.station, m.next, m.nextErr));
+        loadNext(m);
+        m.timer = setInterval(() => loadNext(m), NEXT_MS);
+      });
+      m.on('popupclose', () => clearInterval(m.timer));
+      stationMarkers.set(s.station, m);
+    }
+    m.station = s;
+    return m;
+  }
+
   function draw(data) {
-    layer.clearLayers();
     const t = data.thresholds || {};
     window.peterMap.thresholds = data.thresholds || null;
     for (const s of data.stations || []) if (s.station && s.name) window.peterMap.names.set(s.station, s.name);
@@ -46,20 +94,25 @@
     const order = { ok: 0, warning: 1, severe: 2 };
     const stations = (data.stations || []).filter((s) => typeof s.lat === 'number' && typeof s.lon === 'number')
       .sort((a, b) => (order[a.level] ?? 0) - (order[b.level] ?? 0));
+    const seen = new Set();
     for (const s of stations) {
       const color = COLOR[s.level] || '#8a98b3';
       const radius = 5 + Math.min(10, Math.sqrt(s.lateCount || 0) * 3);
       const [ring, weight] = RING[s.level] || RING.ok;
-      L.circleMarker([s.lat, s.lon], { radius, color: ring, weight, fillColor: color, fillOpacity: .9 })
-        .bindTooltip(`<b>${esc(s.name || s.station)}</b> · ${LEVEL_TEXT[s.level] || 'unknown'}<br>${s.lateCount} late (≥ ${t.minutes} min) · ${s.canceledCount} canceled`)
-        .addTo(layer);
+      const m = stationMarker(s);
+      seen.add(s.station);
+      m.setLatLng([s.lat, s.lon]).setRadius(radius).setStyle({ color: ring, weight, fillColor: color, fillOpacity: .9 });
+      m.setTooltipContent(`<b>${esc(s.name || s.station)}</b> · ${LEVEL_TEXT[s.level] || 'unknown'}<br>${s.lateCount} late (≥ ${t.minutes} min) · ${s.canceledCount} canceled<br><i>Click for next trains</i>`);
+      m.bringToFront();
+      if (m.isPopupOpen()) m.setPopupContent(nextHtml(s, m.next, m.nextErr));
       pts.push([s.lat, s.lon]);
     }
+    for (const [id, m] of stationMarkers) if (!seen.has(id)) { clearInterval(m.timer); layer.removeLayer(m); stationMarkers.delete(id); }
     if (!fitted && pts.length > 1) { map.fitBounds(pts, { padding: [20, 20] }); fitted = true; }
     const counts = stations.reduce((a, s) => (a[s.level] = (a[s.level] || 0) + 1, a), {});
     const status = data.upstream === 'no-key' ? ' · demo data' : data.upstream === 'error' ? ' · upstream error, may be stale' : '';
     note.textContent = `${stations.length} stations · ${counts.severe || 0} severe, ${counts.warning || 0} warning` +
-      ` · station warning from 1 late train, severe from ${t.trains}${status}`;
+      ` · station warning from 1 late train, severe from ${t.trains} (stops in the last 15 min and ahead)${status}`;
   }
 
   async function poll() {

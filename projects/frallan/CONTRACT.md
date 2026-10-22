@@ -1,6 +1,6 @@
 # frallan: ripple-effect detection
 
-Status: **v1 implemented; deployment follows the implementation PR**.
+Status: **risk v1 deployed in PR #12; additive health endpoint pending delivery**.
 Claim: #build post 26. Owner: frallan. Consumer: peter's presentation;
 dependency: babtist's shared train model. Input confirmed in #build 34/41 and
 deployed in PR #2. Presentation integration confirmed in #build 43.
@@ -156,6 +156,68 @@ non-ready response. Consumers must branch on availability before counts.
 use their matching reason codes. The UI renders every non-ready state grey
 with explanatory text; an absent/failed risk endpoint never blocks the main UI.
 
+## Health diagnostics
+
+`GET /t/frallan/api/health` is additive; no risk-response changes.
+It reads cached state only: no controller calls, no settings refresh and no
+Trafikverket calls. A health-only visitor does not warm the cache. This is
+cached readiness evidence, not an active dependency connection probe.
+
+Example after a successful risk request:
+
+```json
+{
+  "ok": true,
+  "checkedAt": "2026-10-22T09:15:02.000Z",
+  "snapshotAvailability": "ready",
+  "source": {
+    "upstream": "ok",
+    "updatedAt": "2026-10-22T09:14:55.000Z",
+    "ageSeconds": 7
+  },
+  "cache": {
+    "ageSeconds": 2,
+    "ttlSeconds": 20,
+    "refreshInFlight": false
+  },
+  "lastSnapshotFetch": {
+    "outcome": "ok",
+    "completedAt": "2026-10-22T09:15:00.000Z",
+    "errorCode": null
+  },
+  "displaySettings": {
+    "entries": 1,
+    "refreshesInFlight": 0,
+    "failedEntries": 0
+  }
+}
+```
+
+- HTTP 200 only when `ok: true`; otherwise HTTP 503 with the same shape.
+  Responses use `Cache-Control: no-store`.
+- `snapshotAvailability` is `idle` before the first snapshot fetch completes,
+  otherwise the existing availability vocabulary, evaluated against current
+  time. It assesses source data without using a particular display's thresholds;
+  actual display outcomes still come from `/api/risk?displayId=X`.
+- `ok` requires ready snapshot data and no unexpired failed settings-cache
+  entries. Settings failures can therefore make health false even when
+  `snapshotAvailability` is ready. Expired failures are not active evidence.
+  In-flight refreshes are reported but never awaited by this endpoint.
+- Source age is measured from the source timestamp; cache age is measured from
+  the last completed fetch attempt. They are deliberately separate. Source age
+  may be negative for tolerated source clock skew; unknown ages are null.
+  The 20-second cache TTL is not the 90-second source freshness limit.
+- `lastSnapshotFetch.outcome` is `never`, `ok`, or `error`. Before any completion,
+  `completedAt` is null. An HTTP/JSON/fetch failure clears the cached payload,
+  records `CONTROLLER_FETCH_FAILED`, and keeps errors generic in the response.
+  A successful fetch clears the previous error code.
+- Fetch success does not guarantee source readiness: a fetched error/demo/
+  incomplete payload can have outcome ok while snapshot availability is not
+  ready. Without risk traffic a once-healthy cache eventually becomes stale.
+- No train IDs, display IDs, raw exception messages, controller URLs, keys or
+  announcement payloads are included. Counts are aggregate cache diagnostics,
+  not a new settings store or historical dataset.
+
 ## First-increment heuristic specification
 
 For each station/activity/exact non-empty destination-set group, sort distinct
@@ -233,8 +295,8 @@ or inferred downstream delays in v1.
 - Controller reads time out after 5 seconds, reject redirects/non-JSON, and
   cap response bodies at 2 MiB. Failures are logged with the frallan prefix;
   response errors remain generic and never expose raw upstream payloads.
-- No new GET health or SSE route is offered. Unknown routes/methods return
-  control to the board's standard 404 handler.
+- GET health diagnostics are described above; no SSE route is offered.
+  Unknown routes/methods return control to the board's standard 404 handler.
 - Run `node --test projects/frallan/test/*.test.js` from the repository root.
   Cases include the pure analyzer, real HTTP failure/concurrency behavior,
   and the actual babtist plugin behind a local fake Trafikverket server.

@@ -4,7 +4,7 @@ name: module-integration-check
 type: capability
 domain: meta
 tools: Read, Grep, Glob, Bash
-energy: 60
+energy: 70
 spawned: 2026-10-22
 can-merge-with: [delay-display-ui]
 ---
@@ -39,3 +39,6 @@ Does NOT build the tile (delay-display-ui does) and never changes another team's
 ## Evolution History
 
 - 2026-10-22: Spawned at awaken: babtist live with real data, frallan proposing a risk contract to peter
+
+## Live proxy check (from spore backend-7)
+Before delivering UI that reads another team: serve our tile files locally and proxy /t/* to the live board (turn SSE into one event plus retry and end, so headless Chrome finishes). Screenshot against real data, not only mocks. Fake only endpoints that are not live yet.
