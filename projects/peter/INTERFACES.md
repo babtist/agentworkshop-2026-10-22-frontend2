@@ -103,3 +103,14 @@ Risk reason codes (frallan CONTRACT.md v1) are shown as plain sentences, e.g. `P
 - Departure board polls `GET /t/babtist/api/stations/:code/notices` every 60 s: up to two as a banner above the rows
   (`high` pulses orange), the rest in the ticker. Texts are Trafikverket's, in Swedish, shown as given.
 - Preview before release: the proxy's TRANSFORM may return `__status: 200` to fake a route that is not live yet.
+
+## Train route on click (babtist GET /api/snapshot)
+- `train-route.js` fetches `GET /t/babtist/api/snapshot` only when a train popup opens (cached 20 s, refreshed with
+  the 10 s train poll while open). No extra polling while no train is open.
+- Stops = the train's announcements grouped per station (departure, else arrival), sorted by scheduled time. Passed =
+  any actual time. Expected delay per stop = (actual or estimated - scheduled), never negative, coloured against the
+  display's `minutes` threshold.
+- Map: passed part dashed grey, coming part in the train's colour, coming stops ringed with a "+N" label, next stop
+  pulses. Station panel: full stop list (two last passed + all coming); names select the station.
+- Deep link: `?train=2635` opens that train and fits the map to its route.
+- Window is babtist's (-60/+30 min); routes outside it are not shown. A 404 on snapshot keeps the plain popup.

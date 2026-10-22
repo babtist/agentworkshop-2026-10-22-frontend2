@@ -232,3 +232,39 @@ body.kiosk .notice-strip { font-size: 1.8vmin; }
 #mapSection { margin-top: 14px; }
 body.kiosk:not(.wall) #mapSection { order: 1; margin-top: 0; }
 body.kiosk:not(.wall) #noticeStrip { order: -1; grid-column: 1 / -1; margin: 0; }
+
+/* Train route (train-route.js): stop list in the train popup and the route on the map. */
+.tr-route { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,.15); }
+.tr-route ol { list-style: none; margin: 4px 0; padding: 0; max-height: 220px; overflow-y: auto; }
+.tr-sum { font-weight: 700; margin-bottom: 2px; }
+.tr-more, .tr-route small, .tr-loading, .tr-empty { color: #666; font-size: 12px; }
+.tr-stop { display: grid; grid-template-columns: 14px 1fr auto 52px; gap: 6px; align-items: center; padding: 2px 0; position: relative; }
+.tr-stop i { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--trc, #8a93a6); background: #fff; justify-self: center; }
+.tr-stop:not(:last-child)::after { content: ''; position: absolute; left: 6px; top: 15px; height: calc(100% - 8px); width: 2px; background: var(--trc, #8a93a6); opacity: .5; }
+.tr-ok { --trc: #1f9e6f; } .tr-warning { --trc: #d9850f; } .tr-severe { --trc: #e8333f; } .tr-unknown, .tr-canceled { --trc: #8a93a6; }
+.tr-passed { color: #888; } .tr-passed i { background: #ccc; border-color: #aaa; }
+.tr-next i { background: var(--trc); box-shadow: 0 0 0 3px rgba(0,0,0,.08); }
+.tr-next .tr-name { font-weight: 700; }
+.tr-name { all: unset; cursor: pointer; text-decoration: underline dotted; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr-name:hover, .tr-name:focus-visible { text-decoration: underline; outline: none; }
+.tr-when { font-variant-numeric: tabular-nums; white-space: nowrap; } .tr-when s { color: #999; }
+.tr-tag { font-weight: 700; color: var(--trc); text-align: right; font-size: 12px; white-space: nowrap; }
+.tr-passed .tr-tag { color: #999; font-weight: 400; }
+.tr-canceled .tr-name { text-decoration: line-through; }
+.tr-label span { display: inline-block; padding: 1px 5px; border-radius: 9px; font: 700 11px/14px system-ui, sans-serif; color: #070b16; background: var(--trc); box-shadow: 0 1px 3px rgba(0,0,0,.5); white-space: nowrap; }
+.tr-label.tr-ok span { background: #5fd7a7; } .tr-label.tr-warning span { background: #ffb454; } .tr-label.tr-severe span { background: #ff5c6c; color: #fff; } .tr-label.tr-unknown span, .tr-label.tr-canceled span { background: #b8bfcc; }
+.tr-ring-next { animation: tr-pulse 1.6s ease-in-out infinite; }
+@keyframes tr-pulse { 50% { stroke-opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .tr-ring-next { animation: none; } }
+.tr-panel { margin: 10px 0; padding: 10px 12px; border: 1px solid rgba(255,255,255,.14); border-left: 4px solid #ffb454; border-radius: 10px; background: rgba(255,255,255,.04); }
+.tr-panel header { display: flex; align-items: center; gap: 6px; }
+.tr-panel header b { font-size: 15px; }
+.tr-close { margin-left: auto; background: none; border: 0; color: inherit; font-size: 20px; line-height: 1; cursor: pointer; padding: 0 4px; }
+.tr-panel .tr-route { border-top: 0; margin-top: 4px; padding-top: 0; }
+.tr-panel .tr-route ol { max-height: none; }
+.tr-panel .tr-more, .tr-panel .tr-route small { color: #9aa3b5; }
+.tr-panel .tr-stop i { background: #0d1324; }
+.tr-panel .tr-passed { color: #8a93a6; } .tr-panel .tr-passed i { background: #2a3142; border-color: #5b6477; }
+.tr-panel .tr-next i { background: var(--trc); }
+.tr-panel .tr-ok { --trc: #5fd7a7; } .tr-panel .tr-warning { --trc: #ffb454; } .tr-panel .tr-severe { --trc: #ff5c6c; }
+.tr-panel .tr-when s, .tr-panel .tr-passed .tr-tag { color: #6c7488; }

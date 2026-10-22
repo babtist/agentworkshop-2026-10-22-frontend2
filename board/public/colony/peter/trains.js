@@ -14,6 +14,7 @@
   const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
     set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
   const q = new URLSearchParams(location.search);
+  let wantTrain = q.get('train');
   const want = q.has('trains') ? q.get('trains') !== '0' : store.get('peter.trains') !== '0';
   if (want) layer.addTo(map);
   map.on('overlayadd', (e) => { if (e.layer === layer) { store.set('peter.trains', '1'); poll(); } });
@@ -83,7 +84,8 @@
       (next ? `Next: ${esc(next.name || next.station)} ${time(next.estimated || next.scheduled)}` +
         (next.estimated && next.scheduled && next.estimated !== next.scheduled ? ` (planned ${time(next.scheduled)})` : '') + '<br>' : '') +
       (last ? `Last: ${esc(last.name || last.station)} ${time(last.at)}<br>` : '') +
-      `<small>Position ${age(ageMs)} old${ageMs > STALE_MS ? ' – may be out of date' : ''}</small></div>`;
+      `<small>Position ${age(ageMs)} old${ageMs > STALE_MS ? ' – may be out of date' : ''}</small>` +
+      (window.peterRoute ? window.peterRoute.html(t.trainId) : '') + '</div>';
   }
 
   const markers = new Map();
@@ -108,7 +110,9 @@
       const stale = !(ageMs <= STALE_MS);
       let m = markers.get(id);
       if (!m) {
-        m = L.marker([t.lat, t.lon], { keyboard: true, riseOnHover: true }).bindPopup('').addTo(layer);
+        m = L.marker([t.lat, t.lon], { keyboard: true, riseOnHover: true }).bindPopup('', { maxWidth: 320, autoPanPadding: [20, 20] }).addTo(layer);
+        m.on('popupopen', () => { window.peterRoute?.open(m.train, m.refresh, m.cls, m.fitRoute, () => m.closePopup()); m.fitRoute = false; });
+        m.on('popupclose', () => window.peterRoute?.close(m.train.trainId));
         markers.set(id, m);
       } else {
         m.setLatLng([t.lat, t.lon]);
@@ -118,9 +122,17 @@
       m.setZIndexOffset(cls === 'severe' ? 300 : cls === 'warning' ? 200 : 0);
       m.options.title = `Train ${t.train || id}: ${label}`;
       m.getElement()?.setAttribute('title', m.options.title);
-      m.setPopupContent(popup(t, label, isNaN(ageMs) ? Infinity : ageMs));
+      m.train = t; m.cls = cls;
+      m.refresh = () => m.setPopupContent(popup(t, label, isNaN(ageMs) ? Infinity : ageMs));
+      m.refresh();
+      if (m.isPopupOpen()) window.peterRoute?.update(t, m.refresh, cls);
     }
-    for (const [id, m] of markers) if (!seen.has(id)) { layer.removeLayer(m); markers.delete(id); }
+    // Deep link ?train=2235 opens that train once it is on the map.
+    if (wantTrain) {
+      const m = [...markers.values()].find((x) => String(x.train.train) === wantTrain || String(x.train.trainId) === wantTrain);
+      if (m) { wantTrain = null; m.fitRoute = true; m.openPopup(); }
+    }
+    for (const [id, m] of markers) if (!seen.has(id)) { window.peterRoute?.close(id); layer.removeLayer(m); markers.delete(id); }
     const status = data.upstream === 'no-key' ? ' (demo data)' : data.upstream === 'error' ? ' (upstream error, may be stale)' : '';
     trainNote.textContent = `${markers.size} trains on the map, pointing the way they run, ${counts.late} late ≥ ${minutes} min, ${counts.canceled} canceled${status}`;
   }
