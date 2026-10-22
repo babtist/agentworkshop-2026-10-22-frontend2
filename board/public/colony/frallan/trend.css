@@ -4,8 +4,7 @@
   --ft-paper: #ffffff;
   --ft-soft: #f5f8f8;
   --ft-border: #e1e8e9;
-  --ft-accent: #3574bb;
-  --ft-accent-soft: #edf3fc;
+  --ft-line: #3574bb;
   box-sizing: border-box;
   color: var(--ft-ink);
   font: 400 14px/1.5 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -14,66 +13,75 @@
 .frallan-trend *::before,
 .frallan-trend *::after { box-sizing: border-box; }
 .frallan-trend[data-availability] {
+  --ft-muted: color-mix(in srgb, currentColor 72%, transparent);
+  --ft-paper: color-mix(in srgb, currentColor 3%, transparent);
+  --ft-soft: color-mix(in srgb, currentColor 5%, transparent);
+  --ft-border: color-mix(in srgb, currentColor 16%, transparent);
   container: frallan-trend / inline-size;
   width: 100%;
   max-width: 1000px;
-  padding: clamp(20px, 4vw, 38px);
+  padding: 12px 14px;
   border: 1px solid var(--ft-border);
-  border-radius: 24px;
+  border-radius: 12px;
   background: var(--ft-paper);
-  box-shadow: 0 16px 50px #19303c08, 0 2px 6px #19303c04;
+  color: inherit;
+  text-align: left;
 }
-.frallan-trend[data-direction="improving"] { --ft-accent: #087f79; --ft-accent-soft: #e7f6f2; }
-.frallan-trend[data-direction="worsening"] { --ft-accent: #bf5141; --ft-accent-soft: #fff0eb; }
-.frallan-trend[data-direction="unknown"] { --ft-accent: #687b88; --ft-accent-soft: #eff3f5; }
+.frallan-trend[data-direction="improving"] { --ft-line: #16877e; }
+.frallan-trend[data-direction="worsening"] { --ft-line: #c87056; }
+.frallan-trend[data-direction="unknown"] { --ft-line: #6e8799; }
 .frallan-trend p, .frallan-trend h2, .frallan-trend h3 { margin: 0; }
 .frallan-trend .frallan-trend-header, .frallan-trend .frallan-trend-chart-header, .frallan-trend .frallan-trend-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
-.frallan-trend .frallan-trend-eyebrow { color: var(--ft-muted); font-size: 10px; font-weight: 750; letter-spacing: .18em; }
-.frallan-trend .frallan-trend-title { margin-top: 5px; font-size: clamp(24px, 4vw, 30px); font-weight: 720; letter-spacing: -.045em; line-height: 1.2; }
-.frallan-trend .frallan-trend-status { flex: none; border: 1px solid var(--ft-border); border-radius: 30px; padding: 6px 11px; color: var(--ft-muted); font-size: 11px; font-weight: 650; }
-.frallan-trend[data-availability="ready"] .frallan-trend-status { color: #08736e; background: #eef8f4; border-color: #cbe8de; }
+.frallan-trend .frallan-trend-title { font-size: 16px; font-weight: 650; letter-spacing: -.02em; line-height: 1.3; }
+.frallan-trend .frallan-trend-status { border: 1px solid var(--ft-border); border-radius: 30px; padding: 3px 8px; color: inherit; font-size: 10px; font-weight: 600; background: var(--ft-soft); }
 .frallan-trend[data-availability="ready"] .frallan-trend-status::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 7px; border-radius: 50%; background: #16877e; }
-.frallan-trend .frallan-trend-display { margin-top: 9px; color: var(--ft-muted); font-size: 12px; overflow-wrap: anywhere; }
-.frallan-trend .frallan-trend-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 30px 0 34px; align-items: center; }
-.frallan-trend .frallan-trend-value { font-size: clamp(56px, 10vw, 80px); line-height: 1; font-weight: 700; letter-spacing: -.07em; font-variant-numeric: tabular-nums; }
-.frallan-trend .frallan-trend-metric-label { margin-top: 6px; font-size: 17px; font-weight: 650; letter-spacing: -.02em; }
+.frallan-trend .frallan-trend-display { color: var(--ft-muted); font-size: 12px; overflow-wrap: anywhere; }
+.frallan-trend .frallan-trend-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 12px 0; align-items: center; }
+.frallan-trend .frallan-trend-value { font-size: 28px; line-height: 1; font-weight: 650; font-variant-numeric: tabular-nums; }
+.frallan-trend .frallan-trend-metric-label { margin-top: 4px; font-size: 12px; font-weight: 600; }
 .frallan-trend .frallan-trend-secondary { margin-top: 5px; color: var(--ft-muted); font-size: 12px; }
-.frallan-trend .frallan-trend-comparison { border-left: 1px solid var(--ft-border); padding-left: clamp(18px, 4vw, 36px); }
-.frallan-trend .frallan-trend-direction { display: inline-flex; align-items: center; gap: 8px; color: var(--ft-accent); background: var(--ft-accent-soft); padding: 7px 13px 7px 9px; border-radius: 10px; font-weight: 700; font-size: 15px; }
-.frallan-trend .frallan-trend-direction-icon { font-size: 24px; line-height: 1; }
-.frallan-trend .frallan-trend-change { margin-top: 13px; color: var(--ft-muted); font-size: 12px; }
-.frallan-trend .frallan-trend-change strong { color: var(--ft-ink); font-size: 23px; font-weight: 650; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
-.frallan-trend .frallan-trend-chart-header { margin-bottom: 12px; align-items: baseline; }
-.frallan-trend .frallan-trend-chart-header h3 { font-size: 12px; font-weight: 650; }
-.frallan-trend .frallan-trend-chart-note { color: var(--ft-muted); font-size: 9px; font-weight: 650; letter-spacing: .08em; text-align: right; }
-.frallan-trend .frallan-trend-chart { display: block; width: 100%; height: auto; overflow: visible; color: var(--ft-accent); }
+.frallan-trend .frallan-trend-comparison { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 10px 0 8px; }
+.frallan-trend .frallan-trend-direction { display: inline-flex; align-items: center; gap: 6px; color: inherit; background: color-mix(in srgb, var(--ft-line) 12%, transparent); border: 1px solid color-mix(in srgb, var(--ft-line) 45%, transparent); padding: 3px 8px; border-radius: 7px; font-weight: 650; font-size: 13px; }
+.frallan-trend .frallan-trend-direction-icon { color: var(--ft-line); font-size: 18px; line-height: 1; }
+.frallan-trend .frallan-trend-change { font-size: 12px; }
+.frallan-trend .frallan-trend-change > span { color: var(--ft-muted); }
+.frallan-trend .frallan-trend-change strong { font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.frallan-trend .frallan-trend-chart-header { align-items: baseline; }
+.frallan-trend .frallan-trend-chart-header h3 { font-size: 11px; font-weight: 600; }
+.frallan-trend .frallan-trend-chart-note { color: var(--ft-muted); font-size: 9px; text-align: right; }
+.frallan-trend .frallan-trend-chart { display: block; width: 100%; height: 116px; overflow: visible; }
 .frallan-trend .frallan-trend-axis { fill: var(--ft-muted); font-size: 11px; }
 .frallan-trend .frallan-trend-guide { stroke: #c99c6a; stroke-width: 1; stroke-dasharray: 4 5; opacity: .65; }
 .frallan-trend .frallan-trend-guide-severe { stroke: #cd8f88; }
 .frallan-trend .frallan-trend-guide-label { fill: var(--ft-muted); font-size: 10px; }
 .frallan-trend .frallan-trend-baseline { stroke: var(--ft-border); }
-.frallan-trend .frallan-trend-series { color: var(--ft-accent); }
+.frallan-trend .frallan-trend-series { color: var(--ft-line); }
 .frallan-trend .frallan-trend-line { fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 .frallan-trend .frallan-trend-sample, .frallan-trend .frallan-trend-current-dot { fill: currentColor; }
-.frallan-trend .frallan-trend-current-dot { stroke: var(--ft-paper); stroke-width: 2; }
+.frallan-trend .frallan-trend-current-dot { stroke: currentColor; stroke-width: 1; }
 .frallan-trend .frallan-trend-current-halo { fill: currentColor; opacity: .15; }
 .frallan-trend .frallan-trend-historical { color: var(--ft-muted); opacity: .65; }
 .frallan-trend .frallan-trend-empty { fill: var(--ft-muted); font-size: 13px; }
 .frallan-trend .frallan-trend-empty-backdrop { fill: var(--ft-paper); }
-.frallan-trend .frallan-trend-notice { display: flex; gap: 12px; padding: 15px 17px; border-radius: 12px; background: var(--ft-soft); margin-top: 23px; }
+.frallan-trend .frallan-trend-caption { margin-top: 4px; color: var(--ft-muted); font-size: 11px; }
+.frallan-trend .frallan-trend-details { margin: 6px 0 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.frallan-trend .frallan-trend-details-toggle { padding: 7px 0; min-height: 32px; color: var(--ft-muted); font-size: 11px; cursor: pointer; }
+.frallan-trend .frallan-trend-details-body { padding-top: 10px; border-top: 1px solid var(--ft-border); }
+.frallan-trend .frallan-trend-notice { display: flex; gap: 8px; padding: 10px; border-radius: 8px; background: var(--ft-soft); margin-top: 12px; }
 .frallan-trend .frallan-trend-notice-icon { color: var(--ft-muted); font-size: 20px; line-height: 1.2; display: grid; place-items: center; flex: none; width: 20px; height: 20px; }
 .frallan-trend .frallan-trend-notice-icon-info { border: 1px solid currentColor; border-radius: 50%; font-size: 12px; font-weight: 700; }
 .frallan-trend .frallan-trend-notice strong { font-size: 12px; font-weight: 650; }
 .frallan-trend .frallan-trend-notice p { color: var(--ft-muted); font-size: 11px; margin-top: 3px; }
-.frallan-trend .frallan-trend-footer { margin-top: 17px; color: var(--ft-muted); font-size: 10px; flex-wrap: wrap; }
-.frallan-trend .frallan-trend-refresh { color: var(--ft-ink); background: var(--ft-paper); border: 1px solid var(--ft-border); border-radius: 7px; padding: 7px 12px; font: inherit; font-size: 11px; cursor: pointer; min-height: 36px; }
+.frallan-trend .frallan-trend-footer { margin-top: 12px; color: var(--ft-muted); font-size: 10px; flex-wrap: wrap; }
+.frallan-trend .frallan-trend-refresh { color: inherit; background: var(--ft-paper); border: 1px solid var(--ft-border); border-radius: 7px; padding: 7px 12px; font: inherit; font-size: 11px; cursor: pointer; min-height: 36px; }
 .frallan-trend .frallan-trend-refresh:hover { background: var(--ft-soft); }
-.frallan-trend .frallan-trend-refresh:focus-visible, .frallan-trend a:focus-visible { outline: 3px solid var(--ft-accent); outline-offset: 3px; }
+.frallan-trend .frallan-trend-refresh:focus-visible, .frallan-trend .frallan-trend-details-toggle:focus-visible, .frallan-trend a:focus-visible { outline: 3px solid var(--ft-line); outline-offset: 3px; }
 .frallan-trend .frallan-trend-reason { margin-top: 7px; color: var(--ft-muted); font: 10px ui-monospace, monospace; }
 .frallan-trend.frallan-trend-page { margin: 0; min-height: 100vh; background: #f3f5f3; }
 .frallan-trend .frallan-trend-shell { width: min(100% - 48px, 880px); margin: 0 auto; padding: 42px 0 24px; }
@@ -85,25 +93,16 @@
   .frallan-trend .frallan-trend-shell { width: calc(100% - 24px); padding-top: 20px; }
   .frallan-trend .frallan-trend-nav { margin-bottom: 18px; }
   .frallan-trend .frallan-trend-nav > span { display: none; }
-  .frallan-trend .frallan-trend-header { align-items: flex-start; flex-direction: column; gap: 10px; }
-  .frallan-trend .frallan-trend-metrics { grid-template-columns: 1fr; gap: 22px; margin: 26px 0; }
-  .frallan-trend .frallan-trend-comparison { border-left: 0; border-top: 1px solid var(--ft-border); padding: 18px 0 0; }
-  .frallan-trend .frallan-trend-chart-note { max-width: 110px; }
-  .frallan-trend .frallan-trend-chart { min-height: 145px; }
+  .frallan-trend .frallan-trend-metrics { grid-template-columns: 1fr; gap: 10px; }
+  .frallan-trend .frallan-trend-chart-note { max-width: 130px; }
 }
 @container frallan-trend (max-width: 420px) {
-  .frallan-trend .frallan-trend-header { align-items: flex-start; flex-direction: column; gap: 10px; }
-  .frallan-trend .frallan-trend-metrics { grid-template-columns: 1fr; gap: 22px; margin: 26px 0; }
-  .frallan-trend .frallan-trend-comparison { border-left: 0; border-top: 1px solid var(--ft-border); padding: 18px 0 0; }
-  .frallan-trend .frallan-trend-chart-note { max-width: 110px; }
+  .frallan-trend .frallan-trend-metrics { grid-template-columns: 1fr; gap: 10px; }
+  .frallan-trend .frallan-trend-chart-note { max-width: 130px; }
 }
 @media (prefers-color-scheme: dark) {
-  .frallan-trend { --ft-ink: #e3edef; --ft-muted: #a5b6bf; --ft-paper: #18282f; --ft-soft: #20333b; --ft-border: #30454e; --ft-accent: #8bb9f5; --ft-accent-soft: #233b58; }
+  .frallan-trend { --ft-ink: #e3edef; --ft-muted: #a5b6bf; --ft-paper: #18282f; --ft-soft: #20333b; --ft-border: #30454e; }
   .frallan-trend.frallan-trend-page { background: #101d23; }
-  .frallan-trend[data-direction="improving"] { --ft-accent: #6cd3c5; --ft-accent-soft: #173f3e; }
-  .frallan-trend[data-direction="worsening"] { --ft-accent: #ffab98; --ft-accent-soft: #49332f; }
-  .frallan-trend[data-direction="unknown"] { --ft-accent: #a5b6bf; --ft-accent-soft: #283b45; }
-  .frallan-trend[data-availability="ready"] .frallan-trend-status { color: #8ddac5; background: #173f36; border-color: #2c6254; }
 }
 @media (prefers-reduced-motion: reduce) {
   .frallan-trend *, .frallan-trend *::before, .frallan-trend *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
