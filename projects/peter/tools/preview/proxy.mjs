@@ -46,8 +46,12 @@ http.createServer(async (req, res) => {
     // TRANSFORM=/abs/file.mjs exporting default (pathname, json) => json: preview a contract change on real data.
     if (process.env.TRANSFORM && (r.headers.get('content-type') || '').includes('json')) {
       const fn = (await import(process.env.TRANSFORM)).default;
-      const out = JSON.stringify(fn(u.pathname, await r.json()));
-      res.writeHead(r.status, { 'content-type': 'application/json' });
+      const j = fn(u.pathname, await r.json());
+      // A transform may set __status to fake a route that is not released yet.
+      const status = j && j.__status ? j.__status : r.status;
+      if (j && j.__status) delete j.__status;
+      const out = JSON.stringify(j);
+      res.writeHead(status, { 'content-type': 'application/json' });
       return res.end(out);
     }
     res.writeHead(r.status, { 'content-type': r.headers.get('content-type') || '' });

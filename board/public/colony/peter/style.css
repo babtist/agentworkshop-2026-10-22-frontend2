@@ -210,3 +210,25 @@ body.kiosk .station-panel { display: none; }
 .sp-table tr.sp-has-info td { border-bottom: 0; }
 .sp-info td { font-size: 12px; color: #e8c37a; padding-top: 0; }
 .sp-moved-badge { background: #ffb000; color: #000; padding: 0 4px; border-radius: 3px; }
+.notice-strip {
+  display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin: 10px 0; padding: 8px 12px;
+  border: 1px solid #6b5300; border-left: 4px solid #ffb000; border-radius: 8px; background: #17140a; color: #f3e2b5; font-size: 14px;
+}
+.notice-strip.ns-has-high { border-left-color: #ff5a4e; }
+.notice-strip ul { list-style: none; margin: 0; padding: 0; flex: 1 1 400px; }
+.notice-strip li { margin: 2px 0; }
+.notice-strip details { flex-basis: 100%; }
+.notice-strip summary { cursor: pointer; color: #ffb000; font-size: 13px; }
+.ns-label { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #ffb000; font-weight: 700; }
+.ns-where { font-weight: 700; color: #ffd27a; }
+.ns-where::after { content: ':'; }
+.ns-high { color: #ffb4ad; }
+.ns-low { opacity: 0.8; }
+.sp-notices { list-style: none; margin: 6px 0 10px; padding: 8px 10px; border-left: 3px solid #ffb000; background: #17140a; border-radius: 4px; font-size: 13px; color: #f3e2b5; }
+.sp-notices li + li { margin-top: 4px; }
+.sp-notices .ns-high { border-left: 0; color: #ffb4ad; font-weight: 600; }
+body.kiosk .notice-strip { font-size: 1.8vmin; }
+/* Map and station panel come first in the page; kiosk keeps cards left, map right, notices across the top. */
+#mapSection { margin-top: 14px; }
+body.kiosk:not(.wall) #mapSection { order: 1; margin-top: 0; }
+body.kiosk:not(.wall) #noticeStrip { order: -1; grid-column: 1 / -1; margin: 0; }

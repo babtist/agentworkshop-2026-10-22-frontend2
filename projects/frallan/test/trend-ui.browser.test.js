@@ -84,12 +84,13 @@ test('real Chromium: visual states, honest history and widget lifecycle', { time
       return;
     }
     const file = {
-      '/colony/frallan/': 'index.html', '/colony/frallan/trend.js': 'trend.js',
-      '/colony/frallan/trend.css': 'trend.css'
+      '/fixtures/trend.html': path.join(__dirname, 'fixtures/trend.html'),
+      '/colony/frallan/trend.js': path.join(assets, 'trend.js'),
+      '/colony/frallan/trend.css': path.join(assets, 'trend.css')
     }[url.pathname];
     if (!file) { res.writeHead(404).end(); return; }
     try {
-      const content = await fs.readFile(path.join(assets, file));
+      const content = await fs.readFile(file);
       res.writeHead(200, { 'Content-Type': file.endsWith('.js') ? 'text/javascript' :
         file.endsWith('.css') ? 'text/css' : 'text/html' }).end(content);
     } catch (error) { res.writeHead(500).end(error.code); }
@@ -109,7 +110,7 @@ test('real Chromium: visual states, honest history and widget lifecycle', { time
   const card = page.locator('section.frallan-trend');
   async function load(nextMode) {
     mode = nextMode;
-    await page.goto(origin + '/colony/frallan/?displayId=hall-1');
+    await page.goto(origin + '/fixtures/trend.html?displayId=hall-1');
     await expect(card).not.toHaveAttribute('data-availability', 'loading');
     await expect(card.locator('svg')).toBeVisible();
   }

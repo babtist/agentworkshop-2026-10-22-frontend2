@@ -64,6 +64,12 @@
     }).join('')}</tbody></table>`;
   }
 
+  // Station notices from notices.js (babtist /api/notices), the texts on this station's screens right now.
+  function noticesFor(code) {
+    const list = window.peterNotices?.forStation(code) || [];
+    return list.length ? `<ul class="sp-notices">${list.map((n) => `<li class="ns-${esc(n.priority || 'normal')}">${esc(n.text)}</li>`).join('')}</ul>` : '';
+  }
+
   function render() {
     if (!current) {
       body.innerHTML = '<p class="sp-note">Click a station on the map, or search for one above.</p>';
@@ -74,7 +80,8 @@
     const lvl = s.level in LEVEL ? s.level : 'unknown';
     const head = `<div class="sp-head"><h3>${esc(s.name)}</h3><span class="sp-badge sp-${lvl}">${LEVEL[lvl] || 'No data'}</span></div>` +
       `<a class="sp-board" href="departures.html?station=${encodeURIComponent(s.station)}" target="_blank" rel="noopener">Open as departure board ↗</a>` +
-      (s.lateCount != null ? `<p class="sp-sum">${s.lateCount} late, ${s.canceledCount} canceled right now</p>` : '');
+      (s.lateCount != null ? `<p class="sp-sum">${s.lateCount} late, ${s.canceledCount} canceled right now</p>` : '') +
+      noticesFor(s.station);
     body.innerHTML = head + (nextErr ? `<p class="sp-note sp-err">${esc(nextErr)}</p>` : next ? rows(next) : '<p class="sp-note">Loading next trains…</p>');
     const age = next?.updatedAt ? Date.now() - new Date(next.updatedAt).getTime() : null;
     fresh.textContent = next?.updatedAt ? `Updated ${new Date(next.updatedAt).toLocaleTimeString('sv-SE')}` + (age > STALE_MS ? ', may be out of date' : '') : '';
@@ -126,6 +133,7 @@
     } else if (current) render();
   });
   window.addEventListener('peter:thresholds', () => render());
+  window.addEventListener('peter:notices', () => { if (current) render(); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
 
   $('stationForm').addEventListener('submit', (e) => {

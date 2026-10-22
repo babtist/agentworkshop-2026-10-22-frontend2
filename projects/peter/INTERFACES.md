@@ -93,3 +93,13 @@ Risk reason codes (frallan CONTRACT.md v1) are shown as plain sentences, e.g. `P
   notes appear as a line under the train and in the board's ticker. Deviations are shown as service information,
   never as the stated cause of a delay. Without the fields everything looks as before.
 - Preview before release: `TRANSFORM=/abs/enrich.mjs node tools/preview/proxy.mjs` rewrites live JSON.
+
+## Station notices (babtist #27, TrainStationMessage)
+
+- `notices.js` polls `GET /t/babtist/api/notices` every 60 s: a "Station notices" strip under the header (3 shown,
+  the rest behind "N more", red edge when any is `high`), hidden when empty or before the route is live (404).
+  Exposes `window.peterNotices.forStation(code)` and dispatches `peter:notices`.
+- Station panel shows the selected station's notices above the next-trains table.
+- Departure board polls `GET /t/babtist/api/stations/:code/notices` every 60 s: up to two as a banner above the rows
+  (`high` pulses orange), the rest in the ticker. Texts are Trafikverket's, in Swedish, shown as given.
+- Preview before release: the proxy's TRANSFORM may return `__status: 200` to fake a route that is not live yet.

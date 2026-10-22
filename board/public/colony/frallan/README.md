@@ -14,8 +14,9 @@ trend.destroy();
 The widget owns only the subtree it appends. It listens for the window event
 `peter:thresholds` (optionally filtered by `detail.displayId`) and discards its
 retained history when thresholds change. No framework or runtime dependency is
-required. The standalone `/colony/frallan/?displayId=hall-1` uses this same widget.
-Omitting the query parameter uses `default`.
+required. Service Trend is displayed only inside the Group App; there is no
+public `index.html` or separate frallan colony tile. Browser tests use a local
+HTML fixture outside the public asset folder.
 
 The card polls the same-origin `/t/frallan/api/trend` endpoint every 15 seconds
 with an eight-second timeout. The chart shows real timestamps over a rolling

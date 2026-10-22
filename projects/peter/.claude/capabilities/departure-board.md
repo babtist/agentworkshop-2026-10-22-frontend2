@@ -1,7 +1,7 @@
 ---
 name: departure-board
 domain: frontend
-energy: 55
+energy: 65
 spawned: 2026-10-22 (split from station-delay-map)
 ---
 

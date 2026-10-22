@@ -21,7 +21,7 @@ body {
 .sign {
   height: 100vh;
   display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  grid-template-rows: auto auto auto 1fr auto;
   grid-template-columns: minmax(0, 1fr);
   padding: 2.4vmin 3vmin;
   gap: 1.2vmin;
@@ -112,3 +112,14 @@ dialog input { width: 100%; font: inherit; font-size: 18px; padding: 8px; backgr
 .pick-row button { font: inherit; background: var(--led); color: #000; border: 0; padding: 8px 14px; cursor: pointer; }
 .pick-row a { color: var(--led); }
 .pick-miss { color: var(--late); margin: 8px 0 0; }
+
+/* Station notices (babtist /stations/:code/notices): what the station's own screens say right now. */
+.sign-notice {
+  font-size: clamp(13px, 2.8vmin, 48px); line-height: 1.3; padding: 0.8vmin 1.4vmin;
+  border: 0.3vmin solid var(--led-dim); border-left-width: 1.2vmin; white-space: normal;
+}
+.sign-notice p { margin: 0; }
+.sign-notice p + p { margin-top: 0.6vmin; }
+.sign-notice .high { color: var(--late); }
+.sign-notice.has-high { border-color: var(--late); animation: pulse 2s ease-in-out 3; }
+@keyframes pulse { 50% { background: rgba(255, 122, 26, 0.15); } }

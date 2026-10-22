@@ -15,7 +15,7 @@
   };
 
   let code = q.get('station') || store.get('peter.station');
-  let stations = new Map(), minutesY = 5, next = null, err = null, nextAt = 0;
+  let stations = new Map(), minutesY = 5, next = null, err = null, nextAt = 0, notices = [];
 
   async function loadStations() {
     try {
@@ -45,6 +45,28 @@
       if (want === code) err = e.message;
     }
     render();
+  }
+
+  // Station notices: 404 before babtist's route is live means "not yet", so show nothing.
+  async function loadNotices() {
+    if (!code || document.hidden) return;
+    const want = code;
+    try {
+      const r = await fetch(`${API}/stations/${encodeURIComponent(want)}/notices`, { cache: 'no-store' });
+      if (want !== code) return;
+      if (r.status === 404) notices = [];
+      else if (r.ok) { const d = await r.json(); notices = Array.isArray(d.notices) ? d.notices : []; }
+    } catch { /* keep the last notices */ }
+    renderNotices();
+  }
+
+  function renderNotices() {
+    const box = $('notice');
+    const show = notices.slice(0, 2);
+    const html = show.map((n) => `<p class="${n.priority === 'high' ? 'high' : ''}">${esc(n.text)}</p>`).join('');
+    box.hidden = !show.length;
+    if (box.dataset.html !== html) { box.dataset.html = html; box.innerHTML = html; }
+    box.classList.toggle('has-high', show.some((n) => n.priority === 'high'));
   }
 
   // One readable line of service information for a train: track change first, then deviations and notes.
@@ -120,6 +142,7 @@
       const msg = [...(t.deviations || []).map((x) => x.text || x.code), ...(t.notes || [])].filter(Boolean);
       if (msg.length) parts.push(`Train ${t.train} to ${to}: ${msg.join(', ')}`);
     }
+    for (const n of notices.slice(2)) parts.push(n.text);
     if (err && next) parts.push(`Could not refresh (${err}), showing the last list`);
     if (age != null) parts.push(`Updated ${new Date(next.updatedAt).toLocaleTimeString('sv-SE')}${age > STALE_MS ? ', may be out of date' : ''}`);
     parts.push(`"Late" means ${minutesY} min or more`);
@@ -153,11 +176,13 @@
     code = s.station; next = null; err = null;
     store.set('peter.station', code);
     const u = new URL(location.href); u.searchParams.set('station', code); history.replaceState(null, '', u);
-    render(); loadNext();
+    notices = []; renderNotices();
+    render(); loadNext(); loadNotices();
   });
   document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - nextAt > NEXT_MS) loadNext(); });
 
-  loadStations(); loadNext();
+  loadStations(); loadNext(); loadNotices();
+  setInterval(loadNotices, 60000);
   setInterval(loadStations, STATIONS_MS);
   setInterval(loadNext, NEXT_MS);
   setInterval(render, 1000);

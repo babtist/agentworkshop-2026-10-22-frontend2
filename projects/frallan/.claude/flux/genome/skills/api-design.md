@@ -67,6 +67,7 @@ DOCUMENTATION
 - List all error conditions
 - Keep docs with code
 - For plugin-to-plugin calls, use a trusted configured base or the server's loopback PORT, never the request Host header (from spore backend-4, team per).
+- Retire a colony tile by removing only its public index.html; preserve shared assets and API routes used by the Group App, then verify those imports still load (from spore frontend1-16, team tomfor).
 ```
 
 ## Contextual Value

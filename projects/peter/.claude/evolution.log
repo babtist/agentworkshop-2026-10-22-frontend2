@@ -20,3 +20,4 @@
 2026-10-22 11:53 EVOLVE: delay-display-ui 55->65, station-delay-map 75->85, live-preview-harness 60->70 (departure board for wall screens)
 2026-10-22 12:29 EVOLVE: station-delay-map 85->95 (track and service info), live-preview-harness 70->80 (TRANSFORM hook previews a contract change on real data)
 2026-10-22 12:30 SPLIT: station-delay-map (95) -> station-delay-map (55, the map) + departure-board (55, sign and next-trains rows)
+2026-10-22 12:48 EVOLVE: departure-board 55->65, group-app-shell 60->70 (station notices in board, panel and app strip)

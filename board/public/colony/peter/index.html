@@ -17,10 +17,9 @@
       <label class="sound" title="Beep when a display's level rises. Kiosk: add sound=1 to the URL."><input type="checkbox" id="sound"> Sound</label>
     </form>
   </header>
+  <section id="noticeStrip" class="notice-strip" hidden aria-label="Station notices"></section>
   <div id="announcer" class="sr-only" role="alert"></div>
   <div id="soundHint" class="sound-hint" hidden>Click anywhere to enable sound alerts</div>
-
-  <div id="grid"></div>
 
   <section id="mapSection">
     <div class="map-row">
@@ -41,6 +40,9 @@
       </aside>
     </div>
   </section>
+
+  <div id="grid"></div>
+
 
   <details id="settings">
     <summary>When does the light turn orange or red? <span class="for">Display <b id="settingsFor"></b></span></summary>
@@ -69,6 +71,7 @@
 <script src="vendor/leaflet.js"></script>
 <script src="map.js"></script>
 <script src="trains.js"></script>
+<script src="notices.js"></script>
 <script src="station-panel.js"></script>
 <script src="trend-frallan.js"></script>
 </body></html>

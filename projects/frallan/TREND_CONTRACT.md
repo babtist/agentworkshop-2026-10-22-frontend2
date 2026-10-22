@@ -75,8 +75,10 @@ widget.destroy();
 
 The module polls /api/trend every 15 seconds, avoids overlapping requests, uses
 bounded request timeouts and refreshes on the existing peter:thresholds event.
-Destroy clears listeners/timers and aborts pending work. A standalone tile at
-/colony/frallan/?displayId=hall-1 demonstrates the same production widget.
+Destroy clears listeners/timers and aborts pending work. Service Trend appears
+only inside the Group App. The public asset folder deliberately has no
+index.html, so colony discovery does not list a separate frallan tile.
+Browser tests mount the same production widget from a test-only HTML fixture.
 
 Design: a polished responsive card with a directional icon/text, late-train
 count, five-minute change, accessible SVG sparkline, warning/severe threshold
