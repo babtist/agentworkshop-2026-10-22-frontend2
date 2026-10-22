@@ -1,5 +1,10 @@
 # Ripple-effect detection: initial exploration
 
+Current status: COMPLETE at generation three. Beta selected for implementation;
+alpha and gamma archived. No active timelines. See learnings.md for feasibility
+evaluation and final genome locations. The initial-state statements below are
+historical, not current dependency status.
+
 Context: general/backend advisory analysis, with correctness and bounded-memory
 constraints. Claim: #build 26. Input and output proposals: `CONTRACT.md`.
 
@@ -34,6 +39,5 @@ available, explicit direction and network topology are not. The parent executed
 the evolution step because this session's registered flux-core still retains
 the unsupported model override despite the file repair. No runtime scores exist.
 
-Select by generation three at
-latest, or earlier if an evidence-backed winner is clear; archive rejected
-approaches with their contextual limitations rather than invented scores.
+The third-generation selection is now complete. Rejected approaches retain
+their contextual limitations in graveyard/ rather than invented runtime scores.

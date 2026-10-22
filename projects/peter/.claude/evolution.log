@@ -4,3 +4,10 @@
 2026-10-22 10:22 SPAWN: module-integration-check (awaken: babtist live, frallan proposing a risk contract to us; need consumer-side contract checks)
 2026-10-22 10:35 EVOLVE: delay-display-ui energy 60->70 (shipped PR #5); module-integration-check holds 50 (awaits frallan); no spawn/merge/dissolve needed
 2026-10-22 10:38 SPAWN: station-delay-map (re-awaken: babtist added /api/stations; Leaflet map layer is a new frontend skill)
+2026-10-22 10:48 EVOLVE: delay-display-ui 70->80 (PR #10 alerts+a11y), station-delay-map 50->60 (PR #8 map + ring cues); module-integration-check holds 50 (stations 404 live, frallan risk not live); no split/merge/dissolve
+2026-10-22 10:52 EVOLVE: module-integration-check 50->60 (verified map vs live stations, mapped frallan reason codes), station-delay-map 60->70 (live tuning); no split/merge/dissolve
+2026-10-22 10:57 EVOLVE: station-delay-map 70->85 (live trains layer from babtist /api/trains); near split threshold, will SPLIT into stations/trains if it passes 90
+2026-10-22 11:06 SPLIT: station-delay-map -> station-delay-map + live-train-layer (energy 85, two layers with separate contracts and 30 s vs 10 s cadence; evolution round)
+2026-10-22 11:06 MUTATE: delay-display-ui scope widened to group-app integration (peter chosen as FrontEnd 2 integrator)
+2026-10-22 11:08 SPAWN: group-app-shell (re-awaken: peter integrates the FrontEnd 2 group app; takes that load off delay-display-ui, which drops 90->80)
+2026-10-22 11:14 EVOLVE: live-train-layer 55->65 (train-shaped markers with glide and labels)

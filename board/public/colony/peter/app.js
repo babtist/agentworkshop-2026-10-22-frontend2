@@ -10,6 +10,11 @@
   const MAX_WALL = 12;
   const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
   const LABEL = { ok: 'Normal', warning: 'Delays', severe: 'Severe delays' };
+  // Shape + text, not only colour, so the level reads without colour vision.
+  const ICON = { ok: '✓', warning: '▲', severe: '✖', unknown: '?' };
+  const RANK = { ok: 0, warning: 1, severe: 2 };
+  const FLASH_MS = 30000;
+  const BASE_TITLE = document.title;
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
@@ -41,17 +46,24 @@
     const meta = el('div', 'meta');
     root.append(title, level, summary, stats, trendBox, notice, meta);
 
-    const card = { id, root, lastAt: 0, samples: [], minutes: null, thresholds: null };
+    const card = { id, root, lastAt: 0, samples: [], minutes: null, thresholds: null, level: null, flashUntil: 0 };
 
     card.setNotice = (text) => { notice.hidden = !text; notice.textContent = text; };
+
+    const setLevel = (lvl, text) => {
+      level.replaceChildren(el('span', 'icon', ICON[lvl] || ICON.unknown), document.createTextNode(text));
+      level.firstChild.setAttribute('aria-hidden', 'true');
+    };
 
     card.render = (s) => {
       card.lastAt = Date.now();
       const lvl = LABEL[s.level] ? s.level : 'unknown';
       const t = s.thresholds || {};
       card.thresholds = t;
-      root.className = 'card lvl-' + lvl;
-      level.textContent = LABEL[lvl] || '?';
+      if (card.level in RANK && lvl in RANK && RANK[lvl] > RANK[card.level]) escalate(card, lvl);
+      card.level = lvl;
+      root.className = 'card lvl-' + lvl + (Date.now() < card.flashUntil ? ' escalated' : '');
+      setLevel(lvl, LABEL[lvl] || '?');
       summary.textContent = `${s.lateCount} train${s.lateCount === 1 ? '' : 's'} ≥ ${t.minutes} min late · warning at ${t.trains}, severe at ${t.trains * 2}`;
       late.textContent = s.lateCount;
       canceled.textContent = s.canceledCount;
@@ -62,11 +74,12 @@
       meta.textContent = `updated ${s.updatedAt ? new Date(s.updatedAt).toLocaleTimeString() : '–'}`;
       addSample(card, s, t);
       drawTrend(trendBox, card);
+      updateTitle();
     };
 
     card.offline = (msg) => {
       root.className = 'card lvl-unknown';
-      level.textContent = 'No data';
+      setLevel('unknown', 'No data');
       summary.textContent = msg;
     };
 
@@ -131,9 +144,74 @@
     box.replaceChildren(svg, cap);
   }
 
+  // ---------- escalation alert: tab title, card flash, screen-reader message, optional sound ----------
+  let cards = [];
+  let flashTimer = null;
+  let audio = null;
+  const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+    set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
+  let soundOn = q.get('sound') === '1' || store.get('peter.sound') === '1';
+
+  function worst() {
+    return cards.reduce((w, c) => (c.level in RANK && (!(w in RANK) || RANK[c.level] > RANK[w]) ? c.level : w), null);
+  }
+
+  function updateTitle(flashOn) {
+    const w = worst();
+    const base = w && w !== 'ok' ? `${ICON[w]} ${LABEL[w]} · ${BASE_TITLE}` : BASE_TITLE;
+    document.title = flashOn && LABEL[w] ? `‼ ${LABEL[w].toUpperCase()} ‼` : base;
+  }
+
+  function escalate(card, lvl) {
+    card.flashUntil = Date.now() + FLASH_MS;
+    setTimeout(() => card.root.classList.remove('escalated'), FLASH_MS);
+    $('announcer').textContent = `Display ${card.id} escalated to ${LABEL[lvl]}.`;
+    clearInterval(flashTimer);
+    let on = false;
+    const end = Date.now() + FLASH_MS;
+    flashTimer = setInterval(() => {
+      on = !on && Date.now() < end;
+      updateTitle(on);
+      if (Date.now() >= end) clearInterval(flashTimer);
+    }, 1000);
+    if (soundOn) beep(lvl === 'severe' ? 3 : 1, lvl === 'severe' ? 880 : 660);
+  }
+
+  function ensureAudio() {
+    if (!audio && (window.AudioContext || window.webkitAudioContext)) audio = new (window.AudioContext || window.webkitAudioContext)();
+    if (audio && audio.state === 'suspended') audio.resume().catch(() => {});
+    return audio;
+  }
+
+  function beep(times, freq) {
+    const ctx = ensureAudio();
+    if (!ctx) return;
+    for (let i = 0; i < times; i++) {
+      const o = ctx.createOscillator(), g = ctx.createGain(), t0 = ctx.currentTime + i * 0.35;
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.25, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.25);
+      o.connect(g).connect(ctx.destination);
+      o.start(t0); o.stop(t0 + 0.3);
+    }
+  }
+
+  // Browsers only allow sound after a user gesture; one click or key press on the page unlocks it (kiosk too).
+  const unlock = () => { if (soundOn) ensureAudio(); $('soundHint').hidden = true; };
+  window.addEventListener('pointerdown', unlock, { once: true });
+  window.addEventListener('keydown', unlock, { once: true });
+  $('sound').checked = soundOn;
+  $('soundHint').hidden = !(soundOn && kiosk);
+  $('sound').addEventListener('change', () => {
+    soundOn = $('sound').checked;
+    store.set('peter.sound', soundOn ? '1' : '0');
+    if (soundOn) beep(1, 660);
+  });
+
   // ---------- page ----------
   const grid = $('grid');
-  const cards = ids.map(makeCard);
+  cards = ids.map(makeCard);
   grid.replaceChildren(...cards.map((c) => c.root));
 
   if (wall) {

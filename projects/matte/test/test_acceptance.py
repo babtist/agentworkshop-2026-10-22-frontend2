@@ -6,6 +6,7 @@ import urllib.parse
 import urllib.request
 import uuid
 from datetime import datetime, timezone
+from math import isfinite
 
 
 BASE_URL = os.environ.get(
@@ -49,6 +50,15 @@ def read_sse_event(response):
             event = line[6:].strip()
         elif line.startswith("data:"):
             data.append(line[5:].lstrip())
+
+
+def skip_if_not_deployed(test_case, code, payload, plugin):
+    if code != 404:
+        return
+    if plugin == "frallan" and "no plugin for frallan" in str(payload):
+        test_case.skipTest("frallan risk plugin is not deployed yet")
+    if plugin == "babtist" and payload == '{"error":"not found"}':
+        test_case.skipTest("babtist train-position endpoint is not deployed yet")
 
 
 class LiveAcceptanceTests(unittest.TestCase):
@@ -130,6 +140,93 @@ class LiveAcceptanceTests(unittest.TestCase):
                 self.assertTrue(deleted["deleted"])
                 code, missing = request(f"{CONTROLLER}/displays/{display_id}")
                 self.assertEqual(code, 404, missing)
+
+    def test_live_station_map_contract(self):
+                display_id = f"matte-stations-{uuid.uuid4().hex[:8]}"
+                code, stations = request(
+                    f"{CONTROLLER}/stations?displayId={urllib.parse.quote(display_id)}"
+                )
+
+                self.assertEqual(code, 200, stations)
+                self.assertEqual(stations["displayId"], display_id)
+                self.assertEqual(stations["upstream"] in {"ok", "error", "no-key"}, True)
+                self.assertEqual(stations["thresholds"], {"trains": 3, "minutes": 5})
+                self.assertGreater(len(stations["stations"]), 0)
+
+                for station in stations["stations"]:
+                    self.assertTrue(station["station"])
+                    self.assertTrue(station["name"])
+                    self.assertIn(station["level"], {"ok", "warning", "severe"})
+                    self.assertGreaterEqual(station["lateCount"], 0)
+                    self.assertGreaterEqual(station["canceledCount"], 0)
+                    if station["lat"] is not None:
+                        self.assertTrue(isfinite(station["lat"]))
+                        self.assertGreaterEqual(station["lat"], -90)
+                        self.assertLessEqual(station["lat"], 90)
+                    if station["lon"] is not None:
+                        self.assertTrue(isfinite(station["lon"]))
+                        self.assertGreaterEqual(station["lon"], -180)
+                        self.assertLessEqual(station["lon"], 180)
+
+    def test_live_train_positions_contract_when_deployed(self):
+                code, trains = request(f"{CONTROLLER}/trains")
+                skip_if_not_deployed(self, code, trains, "babtist")
+                self.assertEqual(code, 200, trains)
+                self.assertIn(trains["upstream"], {"ok", "error", "no-key"})
+                self.assertIsInstance(trains["updatedAt"], str)
+                self.assertEqual(trains["count"], len(trains["trains"]))
+
+                for train in trains["trains"]:
+                    self.assertTrue(train["trainId"])
+                    self.assertTrue(train["train"])
+                    self.assertTrue(isfinite(train["lat"]))
+                    self.assertTrue(isfinite(train["lon"]))
+                    self.assertGreaterEqual(train["lat"], -90)
+                    self.assertLessEqual(train["lat"], 90)
+                    self.assertGreaterEqual(train["lon"], -180)
+                    self.assertLessEqual(train["lon"], 180)
+                    self.assertTrue(
+                        train["bearing"] is None
+                        or (isfinite(train["bearing"]) and 0 <= train["bearing"] <= 360)
+                    )
+                    self.assertIsInstance(train["positionAt"], str)
+                    self.assertTrue(
+                        train["delayMinutes"] is None
+                        or (isfinite(train["delayMinutes"]) and train["delayMinutes"] >= 0)
+                    )
+                    self.assertIsInstance(train["canceled"], bool)
+                    self.assertIsInstance(train["to"], list)
+                    for key in ("lastStation", "nextStation"):
+                        self.assertTrue(train[key] is None or isinstance(train[key], dict))
+
+    def test_live_risk_advisory_contract_when_deployed(self):
+                display_id = f"matte-risk-{uuid.uuid4().hex[:8]}"
+                code, risk = request(
+                    f"{BASE_URL}/t/frallan/api/risk?displayId="
+                    f"{urllib.parse.quote(display_id)}"
+                )
+                skip_if_not_deployed(self, code, risk, "frallan")
+                self.assertIn(code, {200, 503}, risk)
+                self.assertEqual(risk["displayId"], display_id)
+                self.assertIn(
+                    risk["availability"],
+                    {"ready", "insufficient", "stale", "unavailable", "demo"},
+                )
+                self.assertIn(risk["method"], {"station-destination-overlap-v1"})
+                self.assertIsInstance(risk["reasons"], list)
+                self.assertTrue(all(isinstance(reason, str) for reason in risk["reasons"]))
+                if risk["availability"] in {"stale", "unavailable"}:
+                    self.assertEqual(code, 503)
+                else:
+                    self.assertEqual(code, 200)
+                if risk["availability"] == "ready":
+                    self.assertIn(risk["level"], {"ok", "warning", "severe"})
+                    self.assertIsInstance(risk["affectedTrainCount"], int)
+                    self.assertIsInstance(risk["canceledTrainCount"], int)
+                else:
+                    self.assertIsNone(risk["level"])
+                    self.assertIsNone(risk["affectedTrainCount"])
+                    self.assertIsNone(risk["canceledTrainCount"])
 
     def test_presentation_serves_single_display_and_wall_assets(self):
         display_id = f"matte-ui-{uuid.uuid4().hex[:8]}"

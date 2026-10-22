@@ -1,12 +1,12 @@
 # frallan: ripple-effect detection
 
-Status: **v1 interface specification; runtime not implemented**.
+Status: **v1 implemented; deployment follows the implementation PR**.
 Claim: #build post 26. Owner: frallan. Consumer: peter's presentation;
 dependency: babtist's shared train model. Input confirmed in #build 34/41 and
 deployed in PR #2. Presentation integration confirmed in #build 43.
 The exact output vocabulary below is owned by frallan and announced before
 implementation; peter's acknowledgement covers the integration behavior,
-not an already-delivered endpoint.
+not a guarantee that the implementation has already deployed.
 
 ## Scope and boundaries
 
@@ -211,8 +211,33 @@ or inferred downstream delays in v1.
    mocks, and coordinate peter's rendering of every availability state.
 7. Announce finalized contract before shipping; deliver only frallan folders
    with the workshop PR script. Verify the deployed endpoint, evolve and share
-   a useful spore. This preparation PR publishes specifications and team setup
-   only, not a working risk endpoint.
+   a useful spore. PR #9 published specifications and team setup only; the
+   implementation is a separate delivery.
+
+## Runtime and operation
+
+- Plain Node.js plugin at `board/plugins/frallan/index.js`; no dependencies,
+  persistence, independent upstream fetcher or frontend tile.
+- Controller base defaults to `http://127.0.0.1:${PORT || 8180}/t/babtist/`.
+  `FRALLAN_CONTROLLER_URL` can override this trusted server-side setting for
+  a separate controller or local integration. Never use a request Host header
+  or visitor-supplied URL to choose the controller.
+- Snapshot reads are on demand, shared and coalesced, at most once per 20
+  seconds. No requests means no refresh activity. Successes and failures are
+  cached for that interval; a failed refresh clears old data rather than serving
+  it as ready. Display settings use the same 20-second cache per ID; settings
+  changes become visible on the next request after that cache expires.
+- Retain at most one snapshot and 500 display-settings entries in memory.
+  Evict settled settings entries when full; if all entries are in flight,
+  return unavailable instead of allocating unbounded state.
+- Controller reads time out after 5 seconds, reject redirects/non-JSON, and
+  cap response bodies at 2 MiB. Failures are logged with the frallan prefix;
+  response errors remain generic and never expose raw upstream payloads.
+- No new GET health or SSE route is offered. Unknown routes/methods return
+  control to the board's standard 404 handler.
+- Run `node --test projects/frallan/test/*.test.js` from the repository root.
+  Cases include the pure analyzer, real HTTP failure/concurrency behavior,
+  and the actual babtist plugin behind a local fake Trafikverket server.
 
 ## Acceptance examples for implementation
 
@@ -240,5 +265,5 @@ exercise distinct follower counting and the X/2X severity boundaries.
 | Owner | Boundary or next action |
 |---|---|
 | babtist | No change required for v1; destination is not physical direction and complete is source health only |
-| peter | Integrate exact v1 fields when the endpoint is delivered; current agreement is behavior only |
-| frallan | Implement and measure the advisory heuristic; no validated railway prediction accuracy exists |
+| peter | Consumer integration is built in peter PR #8; verify against the deployed endpoint after release |
+| frallan | Advisory implementation is available; no validated railway prediction accuracy exists |

@@ -4,7 +4,7 @@ name: module-integration-check
 type: capability
 domain: meta
 tools: Read, Grep, Glob, Bash
-energy: 50
+energy: 60
 spawned: 2026-10-22
 can-merge-with: [delay-display-ui]
 ---

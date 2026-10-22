@@ -4,7 +4,7 @@ name: station-delay-map
 type: capability
 domain: frontend
 tools: Read, Write, Edit, Grep, Glob, Bash
-energy: 50
+energy: 55
 spawned: 2026-10-22
 can-merge-with: [delay-display-ui]
 ---
@@ -34,8 +34,10 @@ marker per Stockholm commuter station, fed by babtist's `GET /t/babtist/api/stat
 
 ## Boundaries
 
-Does NOT compute delays or fetch station positions (babtist does) and does not touch the main level card.
+Does NOT draw trains (live-train-layer does), does NOT compute delays or fetch station positions (babtist does) and does not touch the main level card.
 
 ## Evolution History
 
 - 2026-10-22: Spawned at re-awaken: babtist shipped /api/stations for a map peter agreed to draw
+- 2026-10-22: live trains layer (trains.js) added (PR #10); energy 85
+- 2026-10-22: SPLIT: the trains layer moved to live-train-layer; this capability keeps map base, stations, legend and layer switch (map.js)

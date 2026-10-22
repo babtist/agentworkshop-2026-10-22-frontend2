@@ -66,6 +66,7 @@ DOCUMENTATION
 - Examples for every endpoint
 - List all error conditions
 - Keep docs with code
+- For plugin-to-plugin calls, use a trusted configured base or the server's loopback PORT, never the request Host header (from spore backend-4, team per).
 ```
 
 ## Contextual Value

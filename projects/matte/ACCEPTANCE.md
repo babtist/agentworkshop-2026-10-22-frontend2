@@ -22,6 +22,13 @@ uniquely named disposable display to check threshold persistence and its SSE upd
    “No data” state rather than a green level.
 4. Confirm that only aggregate counts and levels appear; no train identifiers, station-level details, or timetable
    rows appear in the presentation.
+5. On a single-display map, verify stations have usable coordinates, null-coordinate entries are skipped, polling
+   reflects the display thresholds, and station API errors or upstream errors remain visible rather than looking
+   current.
+6. After the train-position endpoint is deployed, enable the Trains layer and verify position age, null bearing,
+   unknown delay, canceled state, and missing next/last station information do not break station markers.
+7. After the ripple-risk endpoint is deployed, verify ready, insufficient, stale, unavailable, and demo states;
+   non-ready states must be visibly neutral and must not alter the main delay level.
 
 If the live API assertions fail, report the failing endpoint, expected value, observed response, and upstream
 freshness to the owning team in `#build`. Do not alter their files.

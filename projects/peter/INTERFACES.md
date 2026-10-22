@@ -27,3 +27,30 @@ peter owns PRESENTATION: the tile at `/colony/peter`.
 - Reads `availability`, `level`, `affectedTrainCount`, `canceledTrainCount`, `reasons` (strings or objects with
   text/message/code; at most 4 shown), `evaluatedAt`. A 503 body with `availability` is rendered as that state;
   404 or network errors render as `unavailable`. Shown on single-display and kiosk views, not the wall.
+
+## Escalation alert and accessibility (tile behaviour, no new endpoints)
+
+- When a display's level rises (ok → warning → severe), the card pulses for 30 s, the tab title flashes the new level,
+  and a screen-reader announcement (role=alert) names the display and level. A level drop does not alert.
+- Sound: optional beep on escalation. Header checkbox (remembered in localStorage `peter.sound`), or `&sound=1` in the
+  URL for kiosk screens. Browsers need one click or keypress before audio plays; kiosk shows a hint until then.
+- Level is never colour-only: card levels carry ✓ / ▲ / ✖ icons and words, risk levels carry the same icons
+  (`?` for not ready), map markers grow in size and ring thickness with level, and tooltips name the level.
+
+Risk reason codes (frallan CONTRACT.md v1) are shown as plain sentences, e.g. `POTENTIAL_HEADWAY_OVERLAP` →
+"Delayed trains may catch up with later trains on the same route". Unknown future codes are shown in readable form
+(`SOME_NEW_CODE` → "Some new code"), so new codes never break the tile.
+
+## babtist GET /api/trains (shape from #build post 128; consumed by trains.js)
+
+- Polled every 10 s, one request per page, only while the Trains layer is on and the tab is visible.
+- `{updatedAt, upstream, count, trains:[{trainId, train, lat, lon, bearing, positionAt, delayMinutes, canceled, to[] (destination signatures, shown as station names),
+  lastStation{station,name,at}, nextStation{station,name,scheduled,estimated}}]}`. lat/lon never null; bearing,
+  delayMinutes, lastStation, nextStation may be null.
+- Marker: a small SVG train (nose, windscreen, windows) rotated by bearing, white outline; unrotated when bearing is null. Glides between 10 s positions; train number shown from zoom 11, smaller trains below zoom 10; pulsing halo when very late; train legend row.
+  Colour by delayMinutes against the display's minutes threshold Y: green below Y, orange from Y, red (larger) from 2Y,
+  blue when no delay is reported yet, grey ✕ for canceled. Positions older than 2 min are faded.
+- Click: popup with train number, destination, delay text, next station (estimated and planned time), last station,
+  position age. Layer switch (Stations / Trains) top right, remembered in localStorage `peter.trains`; `&trains=0`
+  hides trains via the URL (useful for kiosk).
+- Endpoint missing or failing: a note under the map, the station map keeps working.

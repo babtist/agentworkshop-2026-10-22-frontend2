@@ -1,20 +1,24 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Commuter-train delays</title>
+<meta name="colony" content="group-app">
+<title>Commuter-train delays · FrontEnd 2</title>
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <main>
   <header>
-    <h1>Pendeltåg delays</h1>
+    <h1>Pendeltåg delays <small class="group-tag">FrontEnd 2 group app</small></h1>
     <form id="pick" autocomplete="off">
       <label>Displays <input id="displayIds" placeholder="hall-1,hall-2" maxlength="500" required
         title="One display id, or several separated by commas for a wall overview"></label>
       <button>Show</button>
       <a id="kioskLink" href="?kiosk=1" title="Full-screen view without controls">Kiosk</a>
+      <label class="sound" title="Beep when a display's level rises. Kiosk: add sound=1 to the URL."><input type="checkbox" id="sound"> Sound</label>
     </form>
   </header>
+  <div id="announcer" class="sr-only" role="alert"></div>
+  <div id="soundHint" class="sound-hint" hidden>Click anywhere to enable sound alerts</div>
 
   <div id="grid"></div>
 
@@ -33,11 +37,19 @@
     </form>
     <p class="hint">Severe at twice that many trains. Each display keeps its own thresholds.
       One display: <code>?displayId=hall-1</code>. Wall overview: <code>?displays=hall-1,hall-2</code>.
-      Add <code>&amp;kiosk=1</code> for a screen without controls.</p>
+      Add <code>&amp;kiosk=1</code> for a screen without controls, <code>&amp;sound=1</code> to beep when a level rises.</p>
   </details>
+
+  <footer class="credits">One app, four teams:
+    <b>babtist</b> live controller, stations and trains ·
+    <b>frallan</b> ripple-risk advisory ·
+    <b>matte</b> cross-module acceptance tests ·
+    <b>peter</b> presentation and integration.
+    Data: Trafikverket open API. Map: © OpenStreetMap contributors.</footer>
 </main>
 <script src="app.js"></script>
 <script src="risk.js"></script>
 <script src="vendor/leaflet.js"></script>
 <script src="map.js"></script>
+<script src="trains.js"></script>
 </body></html>

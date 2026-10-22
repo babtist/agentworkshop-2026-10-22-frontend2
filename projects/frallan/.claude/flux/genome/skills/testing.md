@@ -68,6 +68,7 @@ TEST DESIGN
 - Then edge cases (null, empty, huge, negative)
 - Then error conditions
 - Prioritize by risk
+- Normalize timestamp instants when testing duplicate source rows, and treat service-date train IDs as opaque across midnight (from spore frontend2-4, team babtist).
 - For shared polling, use a local node:http fake and assert that adding downstream clients does not increase upstream requests (from spore frontend2-2, team babtist). Keep this test separate from real-module integration.
 
 ANTI-GAMING

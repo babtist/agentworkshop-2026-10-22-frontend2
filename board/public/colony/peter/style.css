@@ -67,7 +67,7 @@ body.kiosk.wall .level { font-size: 5vmin; }
 /* Station map (single display only) */
 #mapSection { margin: 0 0 14px; }
 body.wall #mapSection { display: none; }
-#map { height: 340px; border-radius: 14px; border: 1px solid #1d2a45; background: #0c1324; }
+#map { height: 480px; border-radius: 14px; border: 1px solid #1d2a45; background: #0c1324; }
 .map-note { font-size: 12px; color: #8a98b3; margin-top: 4px; text-align: center; }
 .map-legend { background: #070b16dd; color: #e9eef7; padding: 4px 8px; border-radius: 6px; font: 12px system-ui, sans-serif; display: flex; gap: 10px; }
 .map-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
@@ -92,3 +92,49 @@ body.kiosk:not(.wall) #map { flex: 1; height: auto; min-height: 90vh; }
 .risk-severe  { border-color: #ff5c6c; } .risk-severe .risk-level { color: #ff5c6c; }
 body.kiosk:not(.wall) .risk-level { font-size: 3.5vmin; }
 body.kiosk:not(.wall) #grid { grid-template-rows: 1fr auto; }
+
+/* Escalation alert and accessibility */
+.level .icon { display: inline-block; margin-right: .3em; font-size: .8em; vertical-align: .05em; }
+.card.escalated { animation: escalate 1s ease-in-out infinite; --glow: #ffb454; }
+.lvl-severe.escalated { --glow: #ff5c6c; }
+@keyframes escalate { 50% { box-shadow: 0 0 0 6px var(--glow), 0 0 40px 8px var(--glow); } }
+.sound { display: inline-flex; gap: 4px; align-items: center; font-size: 13px; color: #c7d0e0; cursor: pointer; }
+.sound-hint { position: fixed; bottom: 10px; right: 10px; background: #111a2ee6; border: 1px solid #2a3a5c; padding: 6px 10px; border-radius: 8px; font-size: 13px; z-index: 1000; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .card.escalated, .lvl-severe .level { animation: none; } .card.escalated { box-shadow: 0 0 0 6px var(--glow); } }
+
+/* Live trains layer */
+.train-marker { background: none; border: 0; transition: transform 9s linear; }
+.no-glide .train-marker, .leaflet-zoom-anim .train-marker { transition: none; }
+.train-marker .tm-rot { position: absolute; inset: 0; display: grid; place-items: center; transition: transform .8s ease; }
+.train-marker .tm-body { width: 19px; height: 33px; overflow: visible; filter: drop-shadow(0 1px 2px #070b16cc); }
+.train-marker .tm-body path:first-child { fill: var(--tc); stroke: #fff; stroke-width: 2; }
+.train-marker .tm-glass { fill: #0b1426; opacity: .85; }
+.train-marker .tm-win { fill: #ffffff; opacity: .55; }
+.train-marker .tm-cross { stroke: #c0182c; stroke-width: 3.5; stroke-linecap: round; }
+.train-marker .tm-nodir .tm-body { transform: scale(.85); }
+.train-marker .tm-label { position: absolute; left: 50%; top: 100%; transform: translate(-50%, -2px); display: none;
+  font: 700 10px/1 system-ui, sans-serif; color: #070b16; background: #ffffffe6; border-radius: 4px; padding: 2px 4px; white-space: nowrap; }
+.show-train-labels .train-marker .tm-label { display: block; }
+.tm-ok { --tc: #2fbf87; } .tm-warning { --tc: #ff9f1a; } .tm-severe { --tc: #ff4057; } .tm-unknown { --tc: #6f9cff; } .tm-canceled { --tc: #9aa6bd; }
+.tm-severe .tm-body { width: 23px; height: 39px; }
+.tm-halo { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%;
+  background: #ff405755; animation: tm-pulse 1.6s ease-out infinite; }
+@keyframes tm-pulse { from { transform: scale(.5); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
+.tm-stale { opacity: .4; }
+.map-legend .lg-train { display: inline-block; width: 7px; height: 12px; border-radius: 4px 4px 2px 2px; margin-right: 4px; vertical-align: -1px; background: var(--tc); box-shadow: 0 0 0 1.5px #fff; }
+.tm-stale .tm-halo { display: none; }
+@media (prefers-reduced-motion: reduce) { .train-marker, .train-marker .tm-rot { transition: none; } .tm-halo { animation: none; } }
+.train-pop { font-size: 13px; line-height: 1.45; }
+.train-pop .tp-delay { font-weight: 700; }
+.leaflet-control-layers { background: #111a2ee6; color: #c7d0e0; border: 1px solid #2a3a5c !important; }
+
+/* Group app */
+.group-tag { font-size: 12px; font-weight: 600; color: #8fb4ff; border: 1px solid #2a3a5c; border-radius: 999px; padding: 2px 8px; margin-left: 8px; vertical-align: middle; }
+.credits { margin-top: 18px; font-size: 12px; color: #8a98b3; text-align: center; line-height: 1.6; }
+.credits b { color: #c7d0e0; }
+body.kiosk .credits { display: none; }
+.map-legend { flex-wrap: wrap; row-gap: 4px; }
+.map-legend .lg-trains { flex-basis: 100%; display: flex; gap: 10px; color: #c7d0e0; }
+.map-legend .lg-trains[hidden] { display: none; }
+.small-trains .train-marker .tm-rot > svg { transform: scale(.65); } .small-trains .tm-halo { width: 26px; height: 26px; margin: -13px 0 0 -13px; }
