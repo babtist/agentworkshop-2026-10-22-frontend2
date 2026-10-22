@@ -2,7 +2,7 @@
 include-custom-instructions: true
 name: ceo
 description: Chief Executive Officer - project lead and decision maker. Use PROACTIVELY at project start to work out what the team should build and which team members (agents) it needs, after every delivered PR to review the team, and whenever the same kind of problem has come up twice. Owns strategy, delegation and every hiring decision.
-tools: Read, Grep, Glob, Bash, Task
+tools: Read, Write, Edit, Grep, Glob, Bash, Task
 ---
 
 # CEO - Chief Executive Officer

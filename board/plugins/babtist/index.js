@@ -77,15 +77,20 @@ async function poll() {
   state.updatedAt = state.lastPollAt;
 }
 
+// One poll round. Never throws: a failed poll keeps the last good model and forces a full refresh next time.
+async function tick() {
+  try { await poll(); }
+  catch (err) {
+    state.upstream = 'error';
+    state.changeId = null;
+    console.error('[babtist] poll failed:', err && err.message);
+  }
+  try { broadcast(); } catch (err) { console.error('[babtist] broadcast:', err && err.message); }
+}
+
 function schedule(ms) {
   state.timer = setTimeout(async () => {
-    try { await poll(); }
-    catch (err) {
-      state.upstream = 'error';
-      state.changeId = null;
-      console.error('[babtist] poll failed:', err && err.message);
-    }
-    try { broadcast(); } catch (err) { console.error('[babtist] broadcast:', err && err.message); }
+    try { await tick(); } catch (err) { console.error('[babtist] tick:', err && err.message); }
     schedule(POLL_MS);
   }, ms);
   if (state.timer.unref) state.timer.unref();
@@ -140,6 +145,9 @@ function readBody(req, limit = 1024) {
 }
 
 module.exports = {
+  // Test hook: run one poll round now. Not part of the HTTP contract.
+  _pollNow: tick,
+
   init(ctx) {
     state.displaysFile = path.join(ctx.dataDir, 'displays.json');
     try {

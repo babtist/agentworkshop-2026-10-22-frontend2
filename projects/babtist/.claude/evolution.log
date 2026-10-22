@@ -1,3 +1,5 @@
 # Agent Factory Evolution Log
 2026-10-22 10:10 HIRE: trafikverket-controller-dev (owns the controller plugin: polling, model, API; hired directly, HR candidate round skipped because the CEO subagent had no write tools)
 2026-10-22 10:10 HIRE: delay-api-tester (proves one-upstream-call, per-display thresholds and no key leaks against a fake Trafikverket)
+2026-10-22 10:24 CHANGE: ceo gets Write and Edit tools (the CEO subagent could not write CONTRACT.md or agent files at /start and the work fell back to the main session)
+2026-10-22 10:24 REVIEW: no hire, no retirement (PR 1 merged, PR 2 open; presentation belongs to team peter, ripple analysis to frallan, so no UI or analysis role needed; both new agents are fresh and not yet used as subagents, re-check after the next PR)

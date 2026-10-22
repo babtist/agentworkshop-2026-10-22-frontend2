@@ -4,6 +4,8 @@
 const WINDOW_PAST_MS = 60 * 60 * 1000;
 const WINDOW_FUTURE_MS = 30 * 60 * 1000;
 const DEFAULT_THRESHOLDS = { trains: 3, minutes: 5 };
+// Rows of one ident further apart than this are different runs (the same ident recurs the next day).
+const RUN_GAP_MS = 12 * 60 * 60 * 1000;
 
 const toMs = v => {
   if (!v) return null;
@@ -12,9 +14,8 @@ const toMs = v => {
 };
 
 const iso = ms => (ms == null ? null : new Date(ms).toISOString());
-// Service date in Swedish local time, so a train keeps the same id across midnight UTC.
+// Service date in Swedish local time of the earliest stop seen for the run, so a run keeps one id across 00:00.
 const serviceDate = ms => new Date(ms).toLocaleDateString('sv-SE', { timeZone: 'Europe/Stockholm' });
-const trainIdOf = r => `${r.train}-${serviceDate(r.adv)}`;
 
 function parseResponse(json) {
   const result = json && json.RESPONSE && json.RESPONSE.RESULT && json.RESPONSE.RESULT[0];
@@ -30,13 +31,26 @@ function parseResponse(json) {
 class Model {
   constructor() {
     this.rows = new Map();
+    this.runStart = new Map(); // ident -> earliest advertised time seen for the current run
     this.delays = [];
     this.canceled = 0;
     this.summarize(Date.now());
   }
 
   static keyOf(a) {
-    return [a.AdvertisedTrainIdent, a.LocationSignature, a.ActivityType, a.AdvertisedTimeAtLocation].join('|');
+    // Parsed time, so '...T10:00:00.000+02:00' and '...T08:00:00Z' are the same row.
+    const adv = toMs(a.AdvertisedTimeAtLocation);
+    return [a.AdvertisedTrainIdent, a.LocationSignature, a.ActivityType, adv == null ? a.AdvertisedTimeAtLocation : adv].join('|');
+  }
+
+  trainIdOf(r) {
+    const start = this.runStart.get(r.train);
+    return `${r.train}-${serviceDate(start != null && Math.abs(r.adv - start) <= RUN_GAP_MS ? start : r.adv)}`;
+  }
+
+  noteRun(train, adv) {
+    const start = this.runStart.get(train);
+    if (start == null || Math.abs(adv - start) > RUN_GAP_MS || adv < start) this.runStart.set(train, adv);
   }
 
   apply(items, { full = false, now = Date.now() } = {}) {
@@ -47,6 +61,7 @@ class Model {
       if (a.Deleted) { this.rows.delete(key); continue; }
       const adv = toMs(a.AdvertisedTimeAtLocation);
       if (adv == null) continue;
+      this.noteRun(a.AdvertisedTrainIdent, adv);
       this.rows.set(key, {
         train: a.AdvertisedTrainIdent,
         loc: a.LocationSignature || null,
@@ -64,15 +79,18 @@ class Model {
   // Drops rows outside the window and recomputes one delay value per train.
   summarize(now) {
     const trains = new Map();
+    const live = new Set();
     for (const [key, r] of this.rows) {
       if (r.adv < now - WINDOW_PAST_MS || r.adv > now + WINDOW_FUTURE_MS) { this.rows.delete(key); continue; }
-      const id = trainIdOf(r);
+      live.add(r.train);
+      const id = this.trainIdOf(r);
       let t = trains.get(id);
       if (!t) { t = { canceled: false, lastActAdv: -1, actDelay: null, estDelay: null }; trains.set(id, t); }
       if (r.canceled) t.canceled = true;
-      if (r.act != null && r.adv > t.lastActAdv) { t.lastActAdv = r.adv; t.actDelay = r.act - r.adv; }
+      if (r.act != null) { if (r.adv > t.lastActAdv) { t.lastActAdv = r.adv; t.actDelay = r.act - r.adv; } }
       else if (r.est != null) t.estDelay = Math.max(t.estDelay == null ? -Infinity : t.estDelay, r.est - r.adv);
     }
+    for (const train of this.runStart.keys()) if (!live.has(train)) this.runStart.delete(train);
     const delays = [];
     let canceled = 0;
     for (const t of trains.values()) {
@@ -91,7 +109,7 @@ class Model {
     return [...this.rows.values()]
       .sort((a, b) => a.adv - b.adv)
       .map(r => ({
-        trainId: trainIdOf(r),
+        trainId: this.trainIdOf(r),
         station: r.loc,
         activity: r.activity,
         scheduled: iso(r.adv),

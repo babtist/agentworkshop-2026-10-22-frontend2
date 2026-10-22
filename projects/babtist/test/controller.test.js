@@ -1,5 +1,5 @@
 'use strict';
-// Run: node --test projects/babtist/test/
+// Run: node --test projects/babtist/test/*.test.js
 const test = require('node:test');
 const assert = require('node:assert');
 const http = require('node:http');
