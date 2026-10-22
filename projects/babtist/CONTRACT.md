@@ -98,6 +98,41 @@ triggers an upstream call. Window: `SL Pendeltåg` rows with scheduled time from
 - `complete` is `true` only when `upstream` is `ok`. With `no-key` the data is synthetic demo data (always station `Sci`, no destination).
 - Routes are not included: the controller does not store a train's full timetable, only the announcements above.
 
+### `GET /t/babtist/api/stations?displayId=<id>`
+
+Per-station delay counts for one display, with coordinates, for map markers (agreed with team peter, polled every
+30 s). It never triggers an upstream call. `displayId` as in `/api/status` (default `default`, unknown ids get the
+default thresholds, a bad id gets `400`).
+
+```json
+{
+  "displayId": "hall-1",
+  "updatedAt": "2026-10-22T10:05:12.000Z",
+  "upstream": "ok",
+  "thresholds": { "trains": 3, "minutes": 5 },
+  "stations": [
+    { "station": "Sci", "name": "Stockholm City", "lat": 59.3324, "lon": 18.0649, "lateCount": 2, "canceledCount": 0, "level": "warning" }
+  ]
+}
+```
+
+- `updatedAt` and `upstream` mean the same as in `/api/status`.
+- One entry per station signature with at least one retained announcement in the model window (60 min back,
+  30 min ahead), sorted by `station`.
+- **Delay at a station** = actual (`TimeAtLocation`, else `EstimatedTimeAtLocation`) minus scheduled time for that
+  station's rows, in whole minutes, never negative. If a train has both an arrival and a departure row at the station,
+  the larger delay counts. A train with neither actual nor estimate at the station has no delay there.
+- `lateCount` = distinct trains (by `trainId`) whose delay at that station is >= the display's `minutes`.
+- `canceledCount` = distinct trains with a canceled row at the station. Canceled trains are never also counted as late.
+- Per-station `level` uses the display's `trains` threshold X directly (not the `2 * X` of `/api/status`):
+  - `ok`: `lateCount == 0`
+  - `warning`: `1 <= lateCount < trains`
+  - `severe`: `lateCount >= trains`
+- `name`, `lat`, `lon` (WGS84 decimal degrees) come from Trafikverket `TrainStation`, loaded once at startup and
+  refreshed at most every 24 h (retry at most every 10 min after a failure). A station with unknown coordinates still
+  appears, with `lat` and `lon` `null` (and `name` = signature if the name is unknown too); map UIs can skip it.
+- With `upstream: "no-key"` (demo data) only `Sci` appears, with hardcoded coordinates for Stockholm City.
+
 ### `GET /t/babtist/api/health`
 
 ```json
@@ -107,7 +142,8 @@ triggers an upstream call. Window: `SL Pendeltåg` rows with scheduled time from
 ## Guarantees
 
 - Exactly one upstream poll loop, no matter how many displays or browsers connect.
-- Only the commuter-train rows needed for the current delays are kept, in memory. Only display thresholds are
+- Only the commuter-train rows needed for the current delays, and a station list (signature, name, coordinates),
+  are kept, in memory. Only display thresholds are
   written to disk.
 - Errors: `400` bad input, `404` unknown route/display, `429` too many streams/displays. Body `{ "error": "..." }`.
 

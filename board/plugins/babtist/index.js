@@ -4,18 +4,23 @@
 
 const fs = require('fs');
 const path = require('path');
-const { Model, parseResponse, demoItems, validThresholds, DEFAULT_THRESHOLDS } = require('./model');
+const { Model, parseResponse, parseStations, demoItems, validThresholds, DEFAULT_THRESHOLDS } = require('./model');
 
 const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
 const MAX_DISPLAYS = 500;
 const MAX_STREAMS = 200;
 const FULL_REFRESH_MS = 5 * 60 * 1000;
 const POLL_MS = Math.max(5000, Number(process.env.BABTIST_POLL_MS) || 20000);
+const STATIONS_RETRY_MS = 10 * 60 * 1000;
+const STATIONS_REFRESH_MS = 24 * 60 * 60 * 1000;
+// Demo mode has no key, so no station list: keep one known marker so map UIs have something to draw.
+const FALLBACK_STATIONS = new Map([['Sci', { name: 'Stockholm City', lat: 59.3307, lon: 18.0592 }]]);
 const UPSTREAM_URL = process.env.TRAFIKVERKET_URL || 'https://api.trafikinfo.trafikverket.se/v2/data.json';
 
 const model = new Model();
 const displays = new Map();
 const streams = new Set();
+const stations = { coords: new Map(), loadedAt: 0, attemptAt: 0 };
 const state = { upstream: 'no-key', lastPollAt: null, changeId: null, lastFullAt: 0, updatedAt: new Date().toISOString(), displaysFile: null, timer: null, ping: null };
 
 function loadKey() {
@@ -53,6 +58,58 @@ function buildQuery(key, changeId) {
 </REQUEST>`;
 }
 
+function buildStationQuery(key) {
+  return `<REQUEST>
+  <LOGIN authenticationkey="${key}"/>
+  <QUERY objecttype="TrainStation" namespace="rail.infrastructure" schemaversion="1.5">
+    <FILTER>
+      <EQ name="Advertised" value="true"/>
+    </FILTER>
+    <INCLUDE>LocationSignature</INCLUDE>
+    <INCLUDE>AdvertisedLocationName</INCLUDE>
+    <INCLUDE>Geometry.WGS84</INCLUDE>
+  </QUERY>
+</REQUEST>`;
+}
+
+// Station names and coordinates change rarely: fetch once, retry at most every 10 min, refresh at most every 24 h.
+async function refreshStations(now = Date.now()) {
+  const key = loadKey();
+  if (!key) return;
+  if (stations.loadedAt && now - stations.loadedAt < STATIONS_REFRESH_MS) return;
+  if (stations.attemptAt && now - stations.attemptAt < STATIONS_RETRY_MS) return;
+  stations.attemptAt = now;
+  const res = await fetch(UPSTREAM_URL, {
+    method: 'POST',
+    headers: { 'content-type': 'text/xml' },
+    body: buildStationQuery(key),
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!res.ok) throw new Error('upstream HTTP ' + res.status);
+  const coords = parseStations(await res.json());
+  if (coords.size === 0) throw new Error('empty station list');
+  stations.coords = coords;
+  stations.loadedAt = Date.now();
+}
+
+function stationInfo(sig) {
+  return stations.coords.get(sig) || FALLBACK_STATIONS.get(sig) || { name: sig, lat: null, lon: null };
+}
+
+function stationsBody(id) {
+  const thresholds = thresholdsOf(id);
+  return {
+    displayId: id,
+    updatedAt: state.updatedAt,
+    upstream: state.upstream,
+    thresholds,
+    stations: model.stationsFor(thresholds).map(s => {
+      const info = stationInfo(s.station);
+      return { station: s.station, name: info.name, lat: info.lat, lon: info.lon, lateCount: s.lateCount, canceledCount: s.canceledCount, level: s.level };
+    }),
+  };
+}
+
 async function poll() {
   const key = loadKey();
   if (!key) {
@@ -86,6 +143,7 @@ async function tick() {
     console.error('[babtist] poll failed:', err && err.message);
   }
   try { broadcast(); } catch (err) { console.error('[babtist] broadcast:', err && err.message); }
+  try { await refreshStations(); } catch (err) { console.error('[babtist] station list failed:', err && err.message); }
 }
 
 function schedule(ms) {
@@ -180,6 +238,12 @@ module.exports = {
         count: announcements.length,
         announcements,
       });
+    }
+
+    if (req.method === 'GET' && p === '/api/stations') {
+      const id = params.get('displayId') || 'default';
+      if (!ID_RE.test(id)) return json(res, 400, { error: 'displayId must match [A-Za-z0-9_-]{1,40}' });
+      return json(res, 200, stationsBody(id));
     }
 
     if (req.method === 'GET' && (p === '/api/status' || p === '/api/stream')) {

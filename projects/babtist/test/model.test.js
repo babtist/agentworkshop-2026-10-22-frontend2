@@ -3,7 +3,7 @@
 // Run: node --test projects/babtist/test/*.test.js
 const test = require('node:test');
 const assert = require('node:assert');
-const { Model, parseResponse, demoItems } = require('../../../board/plugins/babtist/model.js');
+const { Model, parseResponse, parseStations, parseWgs84, demoItems } = require('../../../board/plugins/babtist/model.js');
 
 const MIN = 60000;
 // 2026-10-22 00:10 Europe/Stockholm (CEST, UTC+2) = 2026-10-21 22:10 UTC.
@@ -167,4 +167,27 @@ test('demoItems produce a stable, valid status', () => {
   assert.ok(s.trainsTracked > 0);
   assert.ok(s.canceledCount > 0);
   assert.deepStrictEqual(demoItems(NOW), demoItems(NOW));
+});
+
+test('parseWgs84 reads lon then lat and rejects junk', () => {
+  assert.deepStrictEqual(parseWgs84('POINT (18.064852006540633 59.332371649822775)'), { lon: 18.064852006540633, lat: 59.332371649822775 });
+  for (const bad of [null, '', 'POINT (18.06)', 'LINESTRING (1 2, 3 4)', 'POINT (18 999)']) assert.strictEqual(parseWgs84(bad), null);
+});
+
+test('parseStations keeps signature, name and coordinates only, and throws on upstream errors', () => {
+  const m = parseStations({ RESPONSE: { RESULT: [{ TrainStation: [
+    { LocationSignature: 'Sci', AdvertisedLocationName: 'Stockholm City', Geometry: { WGS84: 'POINT (18.0592 59.3307)' }, Extra: 1 },
+    { LocationSignature: 'Nog' },
+    { AdvertisedLocationName: 'no signature' },
+  ] }] } });
+  assert.deepStrictEqual([...m], [['Sci', { name: 'Stockholm City', lat: 59.3307, lon: 18.0592 }], ['Nog', { name: 'Nog', lat: null, lon: null }]]);
+  assert.throws(() => parseStations({ RESPONSE: { RESULT: [{ ERROR: { MESSAGE: 'x' } }] } }), /upstream error/);
+});
+
+test('stationsFor: demo data gives one station, Sci', () => {
+  const m = new Model();
+  m.apply(demoItems(NOW), { full: true, now: NOW });
+  const s = m.stationsFor({ trains: 3, minutes: 5 }, NOW);
+  assert.deepStrictEqual(s.map(x => x.station), ['Sci']);
+  assert.ok(s[0].canceledCount > 0);
 });

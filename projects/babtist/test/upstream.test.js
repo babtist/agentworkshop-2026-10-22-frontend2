@@ -20,6 +20,10 @@ const upstream = http.createServer((req, res) => {
   let b = '';
   req.on('data', c => { b += c; });
   req.on('end', () => {
+    if (b.includes('objecttype="TrainStation"')) {
+      res.setHeader('content-type', 'application/json');
+      return res.end(JSON.stringify({ RESPONSE: { RESULT: [{ TrainStation: [{ LocationSignature: 'Sci', AdvertisedLocationName: 'Stockholm City', Geometry: { WGS84: 'POINT (18.0592 59.3307)' } }] }] } }));
+    }
     bodies.push(b);
     if (mode === '500') { res.writeHead(500); return res.end('boom'); }
     res.setHeader('content-type', 'application/json');
@@ -91,7 +95,7 @@ for (const failure of ['500', 'badjson', 'apierror']) {
 }
 
 test('the API key never reaches a response', async () => {
-  for (const p of ['/api/status', '/api/snapshot', '/api/health']) {
+  for (const p of ['/api/status', '/api/snapshot', '/api/health', '/api/stations']) {
     const text = await (await fetch(base + p)).text();
     assert.ok(!text.includes('test-key-not-real'), p);
   }

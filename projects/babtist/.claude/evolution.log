@@ -3,3 +3,4 @@
 2026-10-22 10:10 HIRE: delay-api-tester (proves one-upstream-call, per-display thresholds and no key leaks against a fake Trafikverket)
 2026-10-22 10:24 CHANGE: ceo gets Write and Edit tools (the CEO subagent could not write CONTRACT.md or agent files at /start and the work fell back to the main session)
 2026-10-22 10:24 REVIEW: no hire, no retirement (PR 1 merged, PR 2 open; presentation belongs to team peter, ripple analysis to frallan, so no UI or analysis role needed; both new agents are fresh and not yet used as subagents, re-check after the next PR)
+2026-10-22 10:33 REVIEW: no hire, no retirement (evolution round; delay-api-tester earned its place by finding two model bugs; trafikverket-controller-dev gets its first real task, the station map endpoint peter asked for; re-check it after that PR)

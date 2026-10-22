@@ -28,6 +28,33 @@ function parseResponse(json) {
   };
 }
 
+// "POINT (18.0592 59.3307)" -> { lon, lat }, or null.
+function parseWgs84(wkt) {
+  const m = /^\s*POINT\s*\(\s*(-?[\d.]+)\s+(-?[\d.]+)\s*\)\s*$/i.exec(typeof wkt === 'string' ? wkt : '');
+  if (!m) return null;
+  const lon = Number(m[1]), lat = Number(m[2]);
+  if (!Number.isFinite(lon) || !Number.isFinite(lat) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  return { lon, lat };
+}
+
+// TrainStation response -> Map(signature -> { name, lat, lon }). Throws on an upstream error, like parseResponse.
+function parseStations(json) {
+  const result = json && json.RESPONSE && json.RESPONSE.RESULT && json.RESPONSE.RESULT[0];
+  if (!result) throw new Error('unexpected response shape');
+  if (result.ERROR) throw new Error('upstream error: ' + (result.ERROR.MESSAGE || 'unknown'));
+  const out = new Map();
+  for (const s of Array.isArray(result.TrainStation) ? result.TrainStation : []) {
+    if (!s || typeof s.LocationSignature !== 'string' || !s.LocationSignature) continue;
+    const p = parseWgs84(s.Geometry && s.Geometry.WGS84);
+    out.set(s.LocationSignature, {
+      name: typeof s.AdvertisedLocationName === 'string' && s.AdvertisedLocationName ? s.AdvertisedLocationName : s.LocationSignature,
+      lat: p ? p.lat : null,
+      lon: p ? p.lon : null,
+    });
+  }
+  return out;
+}
+
 class Model {
   constructor() {
     this.rows = new Map();
@@ -120,6 +147,37 @@ class Model {
       }));
   }
 
+  // Per-station delay counts for one display. A train is counted at a station by its delay at that station only
+  // (the larger of arrival and departure). Canceled trains are counted as canceled, not as late.
+  stationsFor(thresholds, now = Date.now()) {
+    this.summarize(now);
+    const { trains, minutes } = thresholds;
+    const stations = new Map();
+    for (const r of this.rows.values()) {
+      if (!r.loc) continue;
+      let s = stations.get(r.loc);
+      if (!s) { s = new Map(); stations.set(r.loc, s); }
+      const id = this.trainIdOf(r);
+      let t = s.get(id);
+      if (!t) { t = { canceled: false, delay: null }; s.set(id, t); }
+      if (r.canceled) t.canceled = true;
+      const seen = r.act != null ? r.act : r.est;
+      if (seen != null) {
+        const d = Math.max(0, Math.round((seen - r.adv) / 60000));
+        if (t.delay == null || d > t.delay) t.delay = d;
+      }
+    }
+    return [...stations.keys()].sort().map(station => {
+      let lateCount = 0, canceledCount = 0;
+      for (const t of stations.get(station).values()) {
+        if (t.canceled) canceledCount++;
+        else if (t.delay != null && t.delay >= minutes) lateCount++;
+      }
+      const level = lateCount === 0 ? 'ok' : lateCount < trains ? 'warning' : 'severe';
+      return { station, lateCount, canceledCount, level };
+    });
+  }
+
   statusFor(thresholds) {
     const { trains, minutes } = thresholds;
     let lateCount = 0, maxDelay = 0;
@@ -167,4 +225,4 @@ function validThresholds(b) {
     Number.isInteger(b.minutes) && b.minutes >= 1 && b.minutes <= 240;
 }
 
-module.exports = { Model, parseResponse, demoItems, levelThresholds, validThresholds, DEFAULT_THRESHOLDS };
+module.exports = { Model, parseResponse, parseStations, parseWgs84, demoItems, levelThresholds, validThresholds, DEFAULT_THRESHOLDS };

@@ -15,13 +15,15 @@ const ann = (id, advMin, delayMin, extra = {}) => ({
 
 let upstreamCalls = 0;
 let lastBody = '';
+const STATIONS = [{ LocationSignature: 'Sci', AdvertisedLocationName: 'Stockholm City', Geometry: { WGS84: 'POINT (18.0592 59.3307)' } }];
 const upstream = http.createServer((req, res) => {
   upstreamCalls++;
   let b = '';
   req.on('data', c => { b += c; });
   req.on('end', () => {
-    lastBody = b;
     res.setHeader('content-type', 'application/json');
+    if (b.includes('objecttype="TrainStation"')) return res.end(JSON.stringify({ RESPONSE: { RESULT: [{ TrainStation: STATIONS }] } }));
+    lastBody = b;
     res.end(JSON.stringify({ RESPONSE: { RESULT: [{ TrainAnnouncement: [
       ann('1', 20, 7, { ToLocation: [{ LocationName: 'Söc', Priority: 1, Order: 0 }] }), ann('2', 15, 9), ann('3', 10, 12), ann('4', 8, 0), ann('5', 5, 0, { Canceled: true, TimeAtLocation: undefined }),
     ], INFO: { LASTCHANGEID: '42' } }] } }));
